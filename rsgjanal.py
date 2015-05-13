@@ -165,7 +165,27 @@ def trimspec(w1, w2, s2):
     roi = np.where((w2 > w1.min()) & (w2 < w1.max()))[0]
     return w2[roi], s2[roi]
 
+lines = np.genfromtxt('lib/lines.txt')[:, 1]
+import fit
 
+
+def maskline(wave, spec):
+    """Mask regions around lines"""
+    wid = 0.0005  # microns
+    idxall = []
+    for l in lines:
+        idx = np.where((wave > l - wid) & (wave < l + wid))[0]
+        x = wave[idx]
+        y = spec[idx]*-1 + 1.
+        guess = [0.0001, l, 0.0001]  # amp, cen, wid
+        robs = fit.fitline(x, y, (y / np.std(y)), guess)
+        wid = robs.values.values()[1]*6  # 3sigma * 2
+        idx = np.where((wave > l - wid) & (wave < l + wid))[0]
+        idxall.append(idx)
+        # print(spec[idx].std())
+    return idxall
+
+# Start the proceedings:
 print('[INFO] Reading in model grid ...')
 then = time.time()
 mod = ReadMod(
@@ -195,7 +215,7 @@ print('[INFO] Read observed spectra from file:')
 print('[INFO] Please ensure all files are ordered similarly!')
 # n6822 = ReadObs('../ngc6822/Spectra/N6822-spec-24AT.v1.txt')
 
-n6822 = ReadObs('../ngc6822/Spectra/N6822-spec-24AT.v2.txt',
+n6822 = ReadObs('../ngc6822/Spectra/N6822-spec-24AT.v2-sam.txt',
                 '../ngc6822/Photometry/N6822-phot-KMOS-sam-err.txt',
                 mu=ufloat(23.3, 0.05))
 # Prep:
@@ -205,7 +225,7 @@ owave, ospec = trimspec(mod.wave, n6822.wave, n6822.nspec)
 # r10bf = np.genfromtxt('../ngc6822/fits/bestfit/specfit_N6822_24AT_v1_30.dat')
 
 # test:
-# ospec = ospec.T
+ospec = ospec.T
 # ospec = (mrsg4, mrsg9, mrsg11)
 
 # Fix 2 parameters:
@@ -224,38 +244,49 @@ fixin = ((3, 4), (1, 4), (7, 5), (3, 6), (3, 5), (5, 6),
 #          (13, 4), (13, 3), (16, 2), (12, 2))
 
 # fixi = ((15, 4), (13, 4), (16, 2))
-ospec = (mrsg1, mrsg2, mrsg4, mrsg7, mrsg8, mrsg9, mrsg10, mrsg11, mrsg14)
-ossam = contfit.specsam(mod.wave, ospec, owave)
+# ospec = (mrsg1, mrsg2, mrsg4, mrsg7, mrsg8, mrsg9, mrsg10, mrsg11, mrsg14)
+# ossam = contfit.specsam(mod.wave, ospec, owave)
 # ospec = res.degrade(owave, ossam, mod.res, n6822.res)
 # -----------
 params = np.zeros((np.shape(ospec)[0], 4))
 fixout = np.zeros(np.shape(fixi)).astype(int)
 # In this for loop we need more than one spectrum! -- change this!
-for i, spec in enumerate(ospec):
-    # Resample:
-    # print('[INFO] Resampling model grid ...')
-    # then = time.time()
-    # mssam = contfit.specsam(mod.wave, mod.grid, owave)
-    # print('[INFO] Time taken in seconds:', time.time() - then)
+# Going from testing to real observations should be simpler than this!
+# currently:
+# ospec.T --> ospec
+# owave --> mod.wave
+# mdeg --> mod.grid
 
-    # # Degrade:
-    # print('[INFO] Degrading model grid ...')
-    # then = time.time()
-    # mdeg = res.degrade(owave, mssam, mod.res, n6822.res)
-    # print('[INFO] Time taken in seconds:', time.time() - then)
+# Resample:
+print('[INFO] Resampling model grid ...')
+then = time.time()
+mssam = contfit.specsam(mod.wave, mod.grid, owave)
+print('[INFO] Time taken in seconds:', time.time() - then)
+
+# Degrade:
+print('[INFO] Degrading model grid ...')
+then = time.time()
+mdeg = res.degrade(owave, mssam, mod.res, n6822.res)
+print('[INFO] Time taken in seconds:', time.time() - then)
+
+for i, spec in enumerate(ospec):
+    # Find indicies around lines:
+    idx = maskline(owave, spec)  # Observation at Obs. resolution
+    # idx = maskline(mod.wave, spec)  # Model at mod. resolution
     # Constrain the grid to reject unphysical log g's
     glow = np.log10(nom(n6822.glow[i])) - 0.25
     gup = np.log10(nom(n6822.gup[i])) + 0.25
     mod.parlimit(glow, gup, 'GRAVS')
-    mgrid = mod.grid[:, :, mod.parcut]
+    mgrid = mdeg[:, :, mod.parcut]
+    # mgrid = mod.grid[:, :, mod.parcut]
     # Compute chisq:
     print('[INFO] Compute chi-squared grid ...')
     then = time.time()
-    # chi, oscale, cft = bestfit.chigrid(mdeg, spec, owavem, n6822.res)
+    chi, oscale, cft = bestfit.chigrid(mgrid, spec, owave, n6822.res, idx)
     # test1 : use model at degraded res & sampling
     # chi, oscale, cft = bestfit.chigrid(mgrid, spec, owave, n6822.res)
     # test2 : use maodel at orig. res & sampling
-    chi, oscale, cft = bestfit.chigrid2(mgrid, spec, mod.wave, mod.res)
+    # chi, oscale, cft = bestfit.chigrid(mgrid, spec, mod.wave, mod.res, idx)
     vchi = np.ma.masked_where(chi == 0.0, chi, copy=False)
     print('[INFO] Time taken in seconds:', time.time() - then)
 
@@ -265,7 +296,7 @@ for i, spec in enumerate(ospec):
     # mod.par.field('TEMPS')[0] = mod.par.field('TEMPS')[0][5]
     # (xiav, zav, gav, tav), mini = bestfit.bf(chi, mod.par)
     # params[i], mini = bestfit.bf(chi, mod.par)
-    bfobj = bestfit.BestFit(chi, mod.par)
+    bfobj = bestfit.BestFit(vchi, mod.par)
     bfobj.showinit()
     bfobj.showfin()
     print('[INFO] Time taken in seconds:', time.time() - then)
@@ -353,18 +384,29 @@ def errper(a):
 # print('------------------------------------')
 
 # Mask MgI lines
-# import fit
 
 
-# def maskmg(owave, ospec):
-#     wid = 0.0005
-#     mg = np.array([1.1828, 1.2083])
+# def maregion(wave, s, w1, w2):
 #     idx = np.where((owave > mg[0] - wid) & (owave < mg[0] + wid))[0]
 #     guess = [0.0001, mg[0], 0.0001]
 #     x = owave[idx]
 #     y = ospec[idx]*-1 + 1.
 #     rmg1 = fit.fitline(x, y, w=None, guess=guess)
 #     wid = rmg1.values.values()[1]*3
-    # onew = np.ma.masked_where(((owave > mg[0] - wid) &
-    #                            (owave < mg[0] + wid)), owave)
+#     onew = np.ma.masked_where(((owave > mg[0] - wid) &
+#                                (owave < mg[0] + wid)), owave)
 #     return onew
+
+
+def maskmg(owave, ospec):
+    wid = 0.0005
+    mg = np.array([1.1828, 1.2083])
+    idx = np.where((owave > mg[0] - wid) & (owave < mg[0] + wid))[0]
+    guess = [0.0001, mg[0], 0.0001]
+    x = owave[idx]
+    y = ospec[idx]*-1 + 1.
+    rmg1 = fit.fitline(x, y, w=None, guess=guess)
+    wid = rmg1.values.values()[1]*3
+    onew = np.ma.masked_where(((owave > mg[0] - wid) &
+                               (owave < mg[0] + wid)), owave)
+    return onew

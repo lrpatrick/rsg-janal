@@ -189,7 +189,7 @@ def minidx(arr):
     return idx
 
 
-def chigrid(mgrid, ospec, owave, ores):
+def chigrid(mgrid, ospec, owave, ores, idx):
     chi = np.zeros(mgrid.shape[0:4])
     oscale = np.zeros(mgrid.shape)
     cft = np.zeros(np.append(mgrid.shape[0:4], 4))
@@ -203,63 +203,52 @@ def chigrid(mgrid, ospec, owave, ores):
                     if np.isnan(mspec.max()) == False:
                         # I need to find a way to create oscale & chi without
                         # this ridiculous 4D for loop ..
-                        oscale[l, k, j, i], \
-                            chi[l, k, j, i], \
-                            cft[l, k, j, i] = rsgjanal(ospec, owave, ores,
-                                                       mspec, quiet=False)
+                        chi[l, k, j, i], \
+                            oscale[l, k, j, i], \
+                            cft[l, k, j, i] = chiprep(ospec, owave, ores,
+                                                      mspec, idx)
     return chi, oscale, cft
 
 
-def chigrid2(mgrid, ospec, owave, ores):
-    oscale, chi, cft = [rsgjanal(ospec, owave, ores, mgrid[l][k][j][i],
-                        quiet=False)
-                        for i in xrange(mgrid.shape[3])
-                        for j in xrange(mgrid.shape[2])
-                        for k in xrange(mgrid.shape[1])
-                        for l in xrange(mgrid.shape[0])
-                        if ~np.isnan(mgrid[l][k][j][i].max())]
-    return chi, oscale, cft
+def chigrid2(mgrid, ospec, owave, ores, idx):
+    """Calcaulte chisq for each model in grid"""
+    combo = [chiprep(ospec, owave, ores, mgrid[l][k][j][i], idx)
+             for i in xrange(mgrid.shape[3])
+             for j in xrange(mgrid.shape[2])
+             for k in xrange(mgrid.shape[1])
+             for l in xrange(mgrid.shape[0])
+             if ~np.isnan(mgrid[l][k][j][i].max())]
+    # oscale, chi, cft = np.asarray(combo).T
+    # return chi, oscale, cft
+    return combo
 
 
-def rsgjanal(ospec, owave, ores, mspec, quiet=True):
+def chiprep(ospec, owave, ores, mspec, idx):
+    """Preparation for chisq calculation
+        This function could take in a oclass and mspec
     """
-        Trimmed spectra, nothing more to do than run the routines!
-        Full artillery!
-        Make an input file for filenames and resolution for each spectrum
-
-    """
-
-    # 1. Find spectral resolution - lets start by assuimng I know this
-    # 2. Resample models onto ooresbservations
-    # 3. Degrade model spectrum to match resolution of observations
-    # -- use Jesus' routine
-    # 4. Fit the continuum
-    # 5. Derive stellar parameters ... -- done outside function
-    # 6. Define the errors ... -- done outside function
-
-    # Many of the steps are done before this function ...
-    # This should be the function to execute all of that!
-    # It can't be run within a 4D for loop and
-    # 1.:
-
-    # 2.: Resample
-    # mssam = contfit.specsam(mwave, mspec, owave)
-    # 3.:
-    # mdeg = degrader(owave, mspec, mres, ores)
-    # 4.:
-    cft = contfit.contfit2(ores, owave, mspec, ospec)
-
+    cft = contfit.contfit(ores, owave, mspec, ospec)
     # oscale = ospec * cft(owave)
-    oscale = ospec * cft(owave)
+    mscale = mspec / cft(owave)
     # Cross-correlate
-    mcc = cc.ccshift(oscale, mspec, owave)
+    mcc = cc.ccshift(ospec, mscale, owave)
     # Calculate Chisq
-    chi = chicalc(owave, oscale, mcc)
+    # chi = chicalc(owave, mscale, mcc, idx)
+    chi = chicalc2(ospec, mcc, idx)
     # chi = chisq(oscale, np.std(oscale), mcc)
+    return chi, mcc, cft
 
-    if quiet is not True:
-        return oscale, chi, cft
-    return oscale, chi
+
+def chicalc2(ospec, mspec, idx):
+    """
+        Mask regions around lines
+        Fit Gaussian profile to each line
+    """
+    chi = 0.0
+    for i in idx:
+        err = np.std(ospec[i])
+        chi += chisq(ospec[i], err, mspec[i])
+    return chi
 
 
 def chicalc(wave, ospec, mspec):
@@ -270,7 +259,6 @@ def chicalc(wave, ospec, mspec):
         !This is the rate determining step in calculating the chisq grid!
     """
     chi = 0.0
-    # Need to define the width from the fitting process
     wid = 0.0005  # microns
     for l in lines:
         idx = np.where((wave > l - wid) & (wave < l + wid))[0]
@@ -296,7 +284,7 @@ def chicalc(wave, ospec, mspec):
         # Testing:
         # print(robs.fit_report())
         # plt.plot(x, y, 'bo')
-        plt.plot(x, robs.best_fit*-1 + 1., 'r-')
+        # plt.plot(x, robs.best_fit*-1 + 1., 'r-')
     return chi
 
 

@@ -1,4 +1,3 @@
-# Fit the lines:
 """
     Author: LRP
     Date: 08-04-2015

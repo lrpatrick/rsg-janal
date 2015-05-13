@@ -14,78 +14,78 @@ import numpy as np
 from scipy.interpolate import interp1d
 
 
+# def contfit(res, wave, mspec, ospec):
+#     """
+
+#         What do I want this function to be able to do?
+#         1. Read in two spectra over the same wavelength range
+#         2. Scale the flux level of the model to match that of the data
+#         3. Return the scaled model spectrum
+
+#         Arguments:
+#         res : float
+#             Resolution of the observations and model
+#         wave : numpy.ndarray
+#             Wavelength axis for model and observations
+#         mspec : numpy.ndarray
+#             Model spectrum (same size as wave & ospec)
+#         ospec : numpy.ndarray
+#             Observed spectrum
+
+#         Returns:
+#         cft : numpy.lib.polynomial.poly1d
+#             Function which defines the scaling for the model/obs. spectra
+#     """
+
+#     # Checks:
+#     if wave.shape[0] != mspec.shape[0]:
+#         print '[ERROR] confit.confit()'
+#         print '[ERROR]',
+#         print 'Wavelength axis and model spectra are not of same length'
+#         print '[ERROR]',
+#         print 'Exit now'
+#         raise SystemExit
+
+#     if ospec.shape[0] != mspec.shape[0]:
+#         print '[ERROR] confit.confit()'
+#         print '[ERROR]',
+#         print 'Observed and model spectra are not of same length'
+#         print '[ERROR]',
+#         print 'Exit now'
+#         raise SystemExit
+
+#     if res > 10000.:
+#         print '[WARNING] Resolution greater than 10000!'
+#         print '[WARNING] As of Feburary 2015 model resolution is 10000'
+
+#     # Define continuum width
+#     s = 0.5
+#     cw = 1.20 * s / res
+#     nele = np.round(cw / (wave[1] - wave[0]), 0).astype(int)
+#     # Identify 'continuum' points and remove outliers
+#     midx = [x + np.argmax(mspec[x:x + nele])
+#             for x in np.arange(0, ospec.shape[0], nele)]
+
+#     c1 = np.column_stack((wave[midx], mspec[midx]))
+#     c2idx = np.array(midx)[np.where(np.abs(c1[:, 1] - np.median(c1[:, 1]))
+#                                     < 3 * c1[:, 1].std())[0]]
+
+#     # Correction function:
+#     # Take ratio at 'continuum' points:
+#     r2 = mspec[c2idx] / ospec[c2idx]
+#     cf = np.poly1d(np.polyfit(wave[c2idx], r2, 3))
+#     # Remove outliers
+#     c3idx = c2idx[np.where(np.abs(cf(wave[c2idx]) - r2)
+#                            < 3 * r2.std())[0]]
+
+#     # Correction function tuned:
+#     # Repeat previous step with outliers removed
+#     r3 = mspec[c3idx] / ospec[c3idx]
+#     cft = np.poly1d(np.polyfit(wave[c3idx], r3, 3))
+#     return cft
+
+
 def contfit(res, wave, mspec, ospec):
-    """
-
-        What do I want this function to be able to do?
-        1. Read in two spectra over the same wavelength range
-        2. Scale the flux level of the model to match that of the data
-        3. Return the scaled model spectrum
-
-        Arguments:
-        res : float
-            Resolution of the observations and model
-        wave : numpy.ndarray
-            Wavelength axis for model and observations
-        mspec : numpy.ndarray
-            Model spectrum (same size as wave & ospec)
-        ospec : numpy.ndarray
-            Observed spectrum
-
-        Returns:
-        cft : numpy.lib.polynomial.poly1d
-            Function which defines the scaling for the model/obs. spectra
-    """
-
-    # Checks:
-    if wave.shape[0] != mspec.shape[0]:
-        print '[ERROR] confit.confit()'
-        print '[ERROR]',
-        print 'Wavelength axis and model spectra are not of same length'
-        print '[ERROR]',
-        print 'Exit now'
-        raise SystemExit
-
-    if ospec.shape[0] != mspec.shape[0]:
-        print '[ERROR] confit.confit()'
-        print '[ERROR]',
-        print 'Observed and model spectra are not of same length'
-        print '[ERROR]',
-        print 'Exit now'
-        raise SystemExit
-
-    if res > 10000.:
-        print '[WARNING] Resolution greater than 10000!'
-        print '[WARNING] As of Feburary 2015 model resolution is 10000'
-
-    # Define continuum width
-    s = 0.5
-    cw = 1.20 * s / res
-    nele = np.round(cw / (wave[1] - wave[0]), 0).astype(int)
-    # Identify 'continuum' points and remove outliers
-    midx = [x + np.argmax(mspec[x:x + nele])
-            for x in np.arange(0, ospec.shape[0], nele)]
-
-    c1 = np.column_stack((wave[midx], mspec[midx]))
-    c2idx = np.array(midx)[np.where(np.abs(c1[:, 1] - np.median(c1[:, 1]))
-                                    < 3 * c1[:, 1].std())[0]]
-
-    # Correction function:
-    # Take ratio at 'continuum' points:
-    r2 = mspec[c2idx] / ospec[c2idx]
-    cf = np.poly1d(np.polyfit(wave[c2idx], r2, 3))
-    # Remove outliers
-    c3idx = c2idx[np.where(np.abs(cf(wave[c2idx]) - r2)
-                           < 3 * r2.std())[0]]
-
-    # Correction function tuned:
-    # Repeat previous step with outliers removed
-    r3 = mspec[c3idx] / ospec[c3idx]
-    cft = np.poly1d(np.polyfit(wave[c3idx], r3, 3))
-    return cft
-
-
-def contfit2(res, wave, mspec, ospec):
     """
         NEW:
         Read in the full model grid and compute a cft for each model
@@ -93,7 +93,7 @@ def contfit2(res, wave, mspec, ospec):
         What do I want this function to be able to do?
         1. Read in two spectra over the same wavelength range
         2. Scale the flux level of the model to match that of the data
-        3. Return the scaled model spectrum
+        3. Return the scaling function
 
         Arguments:
         res : float
@@ -120,18 +120,6 @@ def contfit2(res, wave, mspec, ospec):
     cw = 1.20 * s / res
     n = np.round((cw / (wave[1] - wave[0])), 0).astype(int)
     # Identify 'continuum' points and remove outliers
-    # Generalise for a 4D grid:
-
-    # def maxidx(spec):
-    #     midx = np.array([x + np.argmax(spec[x:x + n])
-    #                      for x in np.arange(0, spec.shape[0], n)])
-    #     return midx
-
-    # for midx in map(maxidx, mspec):
-    #     sig1 = wave[midx].std()
-    # return sig1
-
-    # Different for every model
     y = np.arange(0, ospec.shape[0], n)
     midx = np.array([x + np.argmax(mspec[x:x + n]) for x in y])
     # c1 = np.column_stack((wave[midx], mspec[midx]))
