@@ -87,7 +87,7 @@ from scipy.interpolate import interp1d
 
 def contfit(res, wave, mspec, ospec):
     """
-        NEW:
+        TODO:
         Read in the full model grid and compute a cft for each model
 
         What do I want this function to be able to do?
@@ -117,7 +117,7 @@ def contfit(res, wave, mspec, ospec):
     # Constants for all models:
     # Define continuum width
     s = 1.0
-    cw = 1.20 * s / res
+    cw = 1.20*s / res
     n = np.round((cw / (wave[1] - wave[0])), 0).astype(int)
     # Identify 'continuum' points and remove outliers
     y = np.arange(0, ospec.shape[0], n)
@@ -125,7 +125,7 @@ def contfit(res, wave, mspec, ospec):
     # c1 = np.column_stack((wave[midx], mspec[midx]))
     sig1 = wave[midx].std()
     wmax = wave[midx]
-    c2idx = midx[np.where(np.abs(wmax - np.median(wmax)) < 3 * sig1)[0]]
+    c2idx = midx[np.where(np.abs(wmax - np.median(wmax)) < 3*sig1)[0]]
 
     # Correction function:
     # Take ratio at 'continuum' points:
@@ -133,8 +133,7 @@ def contfit(res, wave, mspec, ospec):
     cf = np.poly1d(np.polyfit(wave[c2idx], r2, 3))
     # Remove outliers
     r2sig = r2.std()
-    c3idx = c2idx[np.where(np.abs(cf(wave[c2idx]) - r2)
-                           < 3 * r2sig)[0]]
+    c3idx = c2idx[np.where(np.abs(cf(wave[c2idx]) - r2) < 3*r2sig)[0]]
 
     # Correction function tuned:
     # Repeat previous step with outliers removed

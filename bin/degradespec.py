@@ -64,7 +64,7 @@ def degrader(wl, f, rin, rout, quick=False):
         else:
             quick = round(quick)
 
-        ilp = np.int_(np.round((len(wl)- 1)*np.float_(np.arange(quick))/(quick - 1)))
+        ilp = np.int_(np.round((len(wl) - 1)*np.float_(np.arange(quick))/(quick - 1)))
         ddlm = np.median(wl[1:] - wl[:-1])
 
         dlmin = wl[ilp[0:quick-1]]/(s2fwhm*reff)
@@ -75,9 +75,9 @@ def degrader(wl, f, rin, rout, quick=False):
             w = (wl[ilp[indx+1]]-wl[ilp[indx]:ilp[indx+1]+1])/(wl[ilp[indx+1]] - wl[ilp[indx]])
             kmin = np.exp(-0.5*(-3.0+3.0*np.float_(np.arange(2*npxmax[indx]+1))/npxmin[indx])**2)
             kmin = kmin/np.sum(kmin)
-            fmin = scipy.ndimage.filters.convolve(f, kmin, mode = 'reflect')
+            fmin = scipy.ndimage.filters.convolve(f, kmin, mode='reflect')
             kmax = np.exp(-0.5*(-3.0+3.0*np.float_(np.arange(2*npxmax[indx]+1))/npxmax[indx])**2)
             kmax = kmax/np.sum(kmax)
-            fmax = scipy.ndimage.filters.convolve(f, kmax, mode = 'reflect')
+            fmax = scipy.ndimage.filters.convolve(f, kmax, mode='reflect')
             ff[ilp[indx]:ilp[indx+1]+1] = w*fmin[ilp[indx]:ilp[indx+1]+1]+(1 - w)*fmax[ilp[indx]:ilp[indx+1]+1]
     return ff

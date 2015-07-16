@@ -9,7 +9,7 @@ import numpy as np
 from scipy.interpolate import UnivariateSpline
 
 
-def ccshift(s1, s2, x1, shift1=0.0, width=None, quiet=True):
+def ccshift(s1, s2, x1, shift1=None, width=None, quiet=True):
     """
         ccshift performs a cross-correlation and implements a shift based on
         the results
@@ -25,7 +25,7 @@ def ccshift(s1, s2, x1, shift1=0.0, width=None, quiet=True):
         width : int
             Width for the cross-correlation
             Default None == 15 (resolution elements)
-        shift : float
+        shift1 : float
             Shift to implement if known
             Default == 0.0 which allows the module to define the shift
 
@@ -36,35 +36,49 @@ def ccshift(s1, s2, x1, shift1=0.0, width=None, quiet=True):
         shift1 : float
             Shift used to correct s1
     """
-    if shift1 == 0.:
+
+    def checkshifts(s1, s2, s2cc, shift1, quiet=False):
+
+        # Test to make sure correlation has worked
+        shift2, corr_array2 = crossc(s1, s2cc)
+        if quiet is False:
+            print '[INFO] Output from ccshift'
+            print '[INFO] Cross-Correlation shift = ', shift1
+            print '[INFO] After correction shift = ', shift2
+        if abs(shift2) > abs(shift1):
+            print '[WARNING] Cross-Correlation not effective.'
+            print '[WARNING] No correction applied'
+            return s2, 0.0
+        else:
+            return s2cc_fin, shift1
+
+    def shiftnint():
+        """Implement shift and interpolate s2 onto s1"""
+        # Define the xaxis step:
+        step = np.abs(x1[1] - x1[0])
+        xcorr = x1 + shift1 * step
+
+        s2_mod = UnivariateSpline(x1, s2, s=0.)
+        s2_corr = s2_mod(x1)
+        # Now interpolate back onto original axis
+        s2_corr_mod = UnivariateSpline(xcorr, s2_corr, s=0.)
+        s2cc_fin = s2_corr_mod(x1)
+        return s2cc_fin
+
+    if shift1 is None:
         shift1, corr_array1 = crossc(s1, s2, width=width)
+        s2cc_fin = shiftnint()
+        # s2cc_fin = shiftnint(x1, shift1, s1, s2)
+        s2checked, shift1 = checkshifts(s1, s2, s2cc_fin, shift1, quiet=quiet)
+        return s2checked, shift1
 
-    # Define the xaxis step:
-    step = np.abs(x1[1] - x1[0])
-    xcorr = x1 + shift1 * step
-
-    s2_mod = UnivariateSpline(x1, s2, s=0.)
-    s2_corr = s2_mod(x1)
-    # Now interpolate back onto original axis
-    s2_corr_mod = UnivariateSpline(xcorr, s2_corr, s=0.)
-    s2cc_fin = s2_corr_mod(x1)
-    # Test to make sure correlation has worked
-    shift2, corr_array2 = crossc(s1, s2cc_fin)
-
-    if quiet is False:
-        print '[INFO] Output from ccshift'
-        print '[INFO] Cross-Correlation shift = ', shift1
-        print '[INFO] After correction shift = ', shift2
+    else:
+        s2cc_fin = shiftnint()
+        # s2cc_fin = shiftnint(x1, shift1, s1, s2)
         return s2cc_fin, shift1
 
-    if abs(shift2) > abs(shift1):
-        print '[WARNING] Cross-Correlation not effective.'
-        print '[WARNING] No correction applied'
-        s2cc_fin = s2
-        pass
-
-    return s2cc_fin
-    pass
+    # s2cc_fin = checkshifts(s2, s2cc_fin, shift1, shift2)
+    # return s2cc_fin, shift1
 
 
 def crossc(s1, s2, ishift=None, width=None, i1=None, i2=None):
@@ -145,7 +159,7 @@ def crossc(s1, s2, ishift=None, width=None, i1=None, i2=None):
     sig2 = np.sqrt(np.sum((template2 - mean2) ** 2))
     diff2 = template2 - mean2
 
-    for i in range(width):
+    for i in xrange(width):
         it1_start = it2_start - width2 + approx + i
         it1_end = it1_start + nt - 1
         template1 = s1[it1_start:(it1_end + 1)]

@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 
 import contfit
 import cc
-import fit
+# import fit
 # from wrap import rsgjanal
 
 lines = np.genfromtxt('lib/lines.txt')[:, 1]
@@ -27,44 +27,59 @@ lines = np.genfromtxt('lib/lines.txt')[:, 1]
 class BestFit(object):
     """ BestFit:
         Calculate bestfit parameters from a grid of chisq values
+        This class assumes the chisq array has no 0.0 values
 
         Parameters:
         chi :
             Full chisq-array
-        mpar :
-            model parameters
+        mhead :
+            Header for the model grid containing parameter ranges and names
 
         BestFit parameters contained within self.bf
     """
-    def __init__(self, chi, mpar):
-        self.chi = chi
-        self.mpar = mpar
-        self.pnames = self.mpar.dtype.names
-        self.prange = self.mpar[0]
-        self.vchi = np.ma.masked_equal(chi, 0.0, copy=False)
-        self.c = coarsesam(self.vchi, (5, 2, 2, 1))
-        self.cidx = np.unravel_index(np.argmin(self.c), self.c.shape)
-        self.v = np.ma.masked_where(self.vchi != self.c[self.cidx], chi,
+    def __init__(self, fchi, cchi, mhead):
+        self.cchi = cchi
+        self.fchi = fchi
+        self.mhead = mhead
+
+        self.pnames = self.mhead[1]
+        self.prange = self.mhead[0]
+
+        self.ci = np.unravel_index(np.argmin(self.cchi), self.cchi.shape)
+        self.v = np.ma.masked_where(self.fchi != self.cchi[self.ci], self.fchi,
                                     copy=False)
-        self.fi = np.unravel_index(self.v.argmax(), self.vchi.shape)
-        self.min = minima(self.vchi, self.fi, self.prange, quiet=False)
+        # Coarse index on fine grid
+        self.cifg = np.unravel_index(self.v.argmin(), self.v.shape)
+        self.min = minima(self.fchi, self.cifg, self.prange, quiet=True)
         self.bf = [np.mean(self.prange[i][j]) for i, j in enumerate(self.min)]
+        # Fine index
+        self.fi = np.unravel_index(np.argmin(self.fchi), self.fchi.shape)
+        self.fipar = [self.prange[i][j] for i, j in enumerate(self.fi)]
 
     def showinit(self):
         print('[INFO] Initial bestfit parameters:')
-        print('[INFO] Teff, [Z], log g, MicroTurb:')
+        print('[INFO] MicroTurb, [Z], log g, Teff:')
         print('[INFO]', end=' ')
-        for i, j in enumerate(self.cidx):
-            print(self.mpar[0][i][j], end=' ')
+        for i, j in enumerate(self.ci):
+            print(self.prange[i][j], end=' ')
         print('')
 
     def showfin(self):
         print('[INFO] Final bestfit parameters:')
-        print('[INFO] Teff, [Z], log g, MicroTurb:')
+        print('[INFO] MicroTurb, [Z], log g, Teff:')
         print('[INFO]', end=' ')
         for i, j in enumerate(self.min):
             avpar = np.mean(self.prange[i][j])
             print(avpar, end=' ')
+        print('')
+
+    def showmin(self):
+        print('[INFO] Parameters for min of full chisq-grid:')
+        print('[INFO] MicroTurb, [Z], log g, Teff:')
+        print('[INFO]', end=' ')
+        for i, j in enumerate(self.fi):
+            minpar = self.prange[i][j]
+            print(minpar, end=' ')
         print('')
 
 
@@ -77,9 +92,18 @@ def coarsesam(grid, samp):
         How do I sample 2.5x in [Z]???
     """
     if samp == (5, 2, 2, 1):
-        return grid[0::5, 1::2, 0::2, :]
+        return grid[0::5, 1::2, 0::2]
     else:
         print('[WARNING] Sampling changed hack required in bestfit.coursesam')
+
+
+def onedfit(x, y, npoly, nfine):
+    """Simple polynomial fit and resample"""
+    z = np.polyfit(x, y, npoly)
+    f = np.poly1d(z)
+    xfine = np.linspace(x.min(), x.max(), nfine*len(x))
+    yfine = f(xfine)
+    return xfine, yfine
 
 
 def fix2(chi, x, y, xname, yname):
@@ -107,7 +131,7 @@ def minima(chi, idx, mpar, quiet=False):
     chi : numpy.ma.core.MaskedArray
         chisq-array with 0.0's masked out
     idx : tuple
-        4-D index of chi in order:
+        4-D index of chi-squared min in order:
         MicroTurb
         [Z]
         log (g)
@@ -123,8 +147,7 @@ def minima(chi, idx, mpar, quiet=False):
             Three Teff indicies
     """
     xii, zi, gi, ti = idx
-    # xi, z, g, t = mpar
-    t, z, g, xi = mpar
+    xi, z, g, t = mpar
     ximin = np.zeros(3).astype(int)
     zmin = np.zeros(3).astype(int)
     gmin = np.zeros(3).astype(int)
@@ -139,6 +162,7 @@ def minima(chi, idx, mpar, quiet=False):
 
     # Diagnostic plots:
     if quiet is False:
+        # In Gazak 2014 he defines the chi-sq min in each slice
         # cmin = chi.min()
         # n = (cmin + 1, cmin + 2, cmin + 3, cmin + 5, cmin + 10)
         f, ((ax1, ax2, ax3), (ax4, ax5, ax6))\
@@ -180,7 +204,8 @@ def minima(chi, idx, mpar, quiet=False):
 
         plt.show()
 
-    return np.vstack((tmin, zmin, gmin, ximin))
+    # return np.vstack((tmin, zmin, gmin, ximin))
+    return np.vstack((ximin, zmin, gmin, tmin))
 
 
 def minidx(arr):
@@ -189,9 +214,14 @@ def minidx(arr):
     return idx
 
 
-def chigrid(mgrid, ospec, owave, ores, idx):
+# How I calculate the chisq-grid should by simplified!
+
+
+# def chigrid(mgrid, ospec, owave, ores):
+def chigrid(mgrid, ospec, owave, ores, idx, snr):
+    """This function could take in oclass and mspec"""
     chi = np.zeros(mgrid.shape[0:4])
-    oscale = np.zeros(mgrid.shape)
+    mscale = np.zeros(mgrid.shape)
     cft = np.zeros(np.append(mgrid.shape[0:4], 4))
     for i in xrange(mgrid.shape[3]):
         for j in xrange(mgrid.shape[2]):
@@ -201,95 +231,108 @@ def chigrid(mgrid, ospec, owave, ores, idx):
                     mspec = mgrid[l][k][j][i]
                     # Is this check helping?
                     if np.isnan(mspec.max()) == False:
-                        # I need to find a way to create oscale & chi without
+                        # I need to find a way to create mscale & chi without
                         # this ridiculous 4D for loop ..
                         chi[l, k, j, i], \
-                            oscale[l, k, j, i], \
+                            mscale[l, k, j, i], \
                             cft[l, k, j, i] = chiprep(ospec, owave, ores,
-                                                      mspec, idx)
-    return chi, oscale, cft
+                                                      mspec, idx, snr)
+    return chi, mscale, cft
 
 
-def chigrid2(mgrid, ospec, owave, ores, idx):
-    """Calcaulte chisq for each model in grid"""
-    combo = [chiprep(ospec, owave, ores, mgrid[l][k][j][i], idx)
-             for i in xrange(mgrid.shape[3])
-             for j in xrange(mgrid.shape[2])
-             for k in xrange(mgrid.shape[1])
-             for l in xrange(mgrid.shape[0])
-             if ~np.isnan(mgrid[l][k][j][i].max())]
-    # oscale, chi, cft = np.asarray(combo).T
-    # return chi, oscale, cft
-    return combo
+# def chigrid2(mgrid, ospec, owave, ores):
+#     """Calcaulte chisq for each model in grid"""
+#     # Does this function actually give an increase in speed?
+#     combo = [chiprep(ospec, owave, ores, mgrid[l][k][j][i])
+#              for i in xrange(mgrid.shape[3])
+#              for j in xrange(mgrid.shape[2])
+#              for k in xrange(mgrid.shape[1])
+#              for l in xrange(mgrid.shape[0])
+#              if ~np.isnan(mgrid[l][k][j][i].max())]
+#     # oscale, chi, cft = np.asarray(combo).T
+#     # return chi, oscale, cft
+#     return combo
 
 
-def chiprep(ospec, owave, ores, mspec, idx):
-    """Preparation for chisq calculation
+# def chiprep(ospec, owave, ores, mspec):
+def chiprep(ospec, owave, ores, mspec, idx, snr):
+    """Prep for chisq calculation
         This function could take in a oclass and mspec
     """
     cft = contfit.contfit(ores, owave, mspec, ospec)
     # oscale = ospec * cft(owave)
     mscale = mspec / cft(owave)
     # Cross-correlate
-    mcc = cc.ccshift(ospec, mscale, owave)
+    mcc, shift = cc.ccshift(ospec, mscale, owave)
     # Calculate Chisq
+    # chi = chisq(ospec, np.sqrt(ospec), mcc)
     # chi = chicalc(owave, mscale, mcc, idx)
-    chi = chicalc2(ospec, mcc, idx)
+    chi = chicalc2(owave, ospec, mcc, idx, snr)
     # chi = chisq(oscale, np.std(oscale), mcc)
     return chi, mcc, cft
 
 
-def chicalc2(ospec, mspec, idx):
-    """
-        Mask regions around lines
-        Fit Gaussian profile to each line
-    """
+def chicalc2(owave, ospec, mspec, idx, snr):
+    """Cross-correlate smaller chuncks around diag. lines"""
+    # spectral slices to appease the cross-correlation
+    cci0 = np.where((owave > 1.187) & (owave < 1.190))[0]
+    cci1 = np.where((owave > 1.194) & (owave < 1.196))[0]
+    cci2 = idx[2]
+    cci3 = np.where((owave > 1.201) & (owave < 1.204))[0]
+    cci4 = np.where((owave > 1.209) & (owave < 1.211))[0]
+
+    cci = (cci0, cci1, cci2, cci3, cci4)
     chi = 0.0
-    for i in idx:
-        err = np.std(ospec[i])
-        chi += chisq(ospec[i], err, mspec[i])
-    return chi
-
-
-def chicalc(wave, ospec, mspec):
-    """
-        Mask regions around lines
-        Fit Gaussian profile to each line
-
-        !This is the rate determining step in calculating the chisq grid!
-    """
-    chi = 0.0
-    wid = 0.0005  # microns
-    for l in lines:
-        idx = np.where((wave > l - wid) & (wave < l + wid))[0]
-        # Observed
-        x = wave[idx]
-        y = ospec[idx]*-1 + 1.
-        guess = [0.0001, l, 0.0001]  # amp, cen, wid
-        robs = fit.fitline(x, y, (y / np.std(y)), guess)
-        wid = robs.values.values()[1]*6  # 3sigma * 2
-        idx = np.where((wave > l - wid) & (wave < l + wid))[0]
-        # Model
-        # ymod = mspec[idx]*-1 + 1.
-        # rmod = fit.fitline(x, ymod, (ymod / np.std(ymod)), guess)
-        # How to define the "error on the line strength"?
-        # A first guess from fitting the line ...
-        # err = 2.11e-06
-        # err = robs.params.values()[0].stderr
-        # err = y - robs.best_fit
-        err = np.std(ospec[idx])
-        # print err
-        chi += chisq(ospec[idx], err, mspec[idx])
-        # chi += chisq(robs.best_fit, err, rmod.best_fit)
-        # Testing:
-        # print(robs.fit_report())
-        # plt.plot(x, y, 'bo')
-        # plt.plot(x, robs.best_fit*-1 + 1., 'r-')
+    for i, ci in zip(idx, cci):
+        # snr = np.sqrt(ospec[i])
+        # spec1, s1 = cc.ccshift(ospec[ci], mspec[ci], owave[ci], quiet=True)
+        # print('[INFO] Shift = ', s1)
+        # ccspec, s2 = cc.ccshift(spec1, mspec, owave, shift1=s1, quiet=True)
+        chi += chisq(ospec[i], 1. / snr, mspec[i]) / len(i)
+        # print(len(i))
+        # print(chi)
     return chi
 
 
 def chisq(obs, err, mod):
     return np.sum(((obs - mod)**2) / err**2)
+
+
+# def chicalc(wave, ospec, mspec):
+#     """
+#         Mask regions around lines
+#         Fit Gaussian profile to each line
+
+#         !This is the rate determining step in calculating the chisq grid!
+#     """
+#     chi = 0.0
+#     wid = 0.0005  # microns
+#     for l in lines:
+#         idx = np.where((wave > l - wid) & (wave < l + wid))[0]
+#         # Observed
+#         x = wave[idx]
+#         y = ospec[idx]*-1 + 1.
+#         guess = [0.0001, l, 0.0001]  # amp, cen, wid
+#         robs = fit.fitline(x, y, (y / np.std(y)), guess)
+#         wid = robs.values.values()[1]*6  # 3sigma * 2
+#         idx = np.where((wave > l - wid) & (wave < l + wid))[0]
+#         # Model
+#         # ymod = mspec[idx]*-1 + 1.
+#         # rmod = fit.fitline(x, ymod, (ymod / np.std(ymod)), guess)
+#         # How to define the "error on the line strength"?
+#         # A first guess from fitting the line ...
+#         # err = 2.11e-06
+#         # err = robs.params.values()[0].stderr
+#         # err = y - robs.best_fit
+#         err = np.sqrt(ospec[idx])
+#         # print err
+#         chi += chisq(ospec[idx], err, mspec[idx])
+#         # chi += chisq(robs.best_fit, err, rmod.best_fit)
+#         # Testing:
+#         # print(robs.fit_report())
+#         # plt.plot(x, y, 'bo')
+#         # plt.plot(x, robs.best_fit*-1 + 1., 'r-')
+#     return chi
 
 
 def cplot(x, y, z, n, xname, yname):
@@ -389,59 +432,59 @@ def changeindx(i, n):
 # Not used:
 
 
-def bf(chi, mpar, quiet=False):
-    """
-        Calculate bestfit parameters from a grid of chisq values
+# def bf(chi, mpar, quiet=False):
+#     """
+#         Calculate bestfit parameters from a grid of chisq values
 
-        Parameters:
-        chi :
-            Full chisq-array
-        mpar :
-            model parameters
+#         Parameters:
+#         chi :
+#             Full chisq-array
+#         mpar :
+#             model parameters
 
-        Returns:
-        tav, gav, xiv, zav : floats
-            Average bestfit parameter for effective temperature,
-            sufrace gravity, microturbulence and metallicity
-    """
-    # Make mpar more readable!
-    xi = mpar.field('TURBS')[0]  # 21
-    z = mpar.field('ABUNS')[0]  # 19
-    g = mpar.field('GRAVS')[0]  # 9
-    t = mpar.field('TEMPS')[0]  # 11
+#         Returns:
+#         tav, gav, xiv, zav : floats
+#             Average bestfit parameter for effective temperature,
+#             sufrace gravity, microturbulence and metallicity
+#     """
+#     # Make mpar more readable!
+#     xi = mpar.field('TURBS')[0]  # 21
+#     z = mpar.field('ABUNS')[0]  # 19
+#     g = mpar.field('GRAVS')[0]  # 9
+#     t = mpar.field('TEMPS')[0]  # 11
 
-    # Mask out obsolete 0.0's:
-    vchi = np.ma.masked_equal(chi, 0.0, copy=False)
-    coarse = coarsesam(vchi, (5, 2, 2, 1))
-    idx = np.unravel_index(np.argmin(coarse), coarse.shape)
-    xii, zi, gi, ti = idx
-    print('[INFO] Initial bestfit parameters:')
-    print('[INFO] Teff, log g, MicroTurb, [Z]:')
-    print('[INFO]', t[ti], g[gi], xi[xii], z[zi])
-    print('[INFO] Chisq min = ', coarse.min())
+#     # Mask out obsolete 0.0's:
+#     vchi = np.ma.masked_equal(chi, 0.0, copy=False)
+#     coarse = coarsesam(vchi, (5, 2, 2, 1))
+#     idx = np.unravel_index(np.argmin(coarse), coarse.shape)
+#     xii, zi, gi, ti = idx
+#     print('[INFO] Initial bestfit parameters:')
+#     print('[INFO] Teff, log g, MicroTurb, [Z]:')
+#     print('[INFO]', t[ti], g[gi], xi[xii], z[zi])
+#     print('[INFO] Chisq min = ', coarse.min())
 
-    # Coarse index on fine grid:
-    v = np.ma.masked_where(vchi != coarse[idx], chi, copy=False)
-    fi = np.unravel_index(v.argmax(), vchi.shape)
-    # Mask out obsolete 0.0's:
-    # vchi = np.ma.masked_equal(chi, 0.0, copy=False)
-    # Fix the params and find minima:
-    mini = minima(vchi, fi, (xi, z, g, t), quiet=quiet)
-    # # Average values:
-    xiav = np.mean(xi[mini[0]])
-    zav = np.mean(z[mini[1]])
-    gav = np.mean(g[mini[2]])
-    tav = np.mean(t[mini[3]])
+#     # Coarse index on fine grid:
+#     v = np.ma.masked_where(vchi != coarse[idx], chi, copy=False)
+#     fi = np.unravel_index(v.argmax(), vchi.shape)
+#     # Mask out obsolete 0.0's:
+#     # vchi = np.ma.masked_equal(chi, 0.0, copy=False)
+#     # Fix the params and find minima:
+#     mini = minima(vchi, fi, (xi, z, g, t), quiet=quiet)
+#     # # Average values:
+#     xiav = np.mean(xi[mini[0]])
+#     zav = np.mean(z[mini[1]])
+#     gav = np.mean(g[mini[2]])
+#     tav = np.mean(t[mini[3]])
 
-    print('------------------------------------------------')
-    print('[INFO] Calculated bestfit parameters:')
-    print('[INFO] Teff, logg, MickyTurb, [Z]')
-    print('[INFO]', tav, gav, xiav, zav)
-    print('------------------------------------------------')
-    if quiet is False:
-        print('[INFO] Prepare for some plots!')
+#     print('------------------------------------------------')
+#     print('[INFO] Calculated bestfit parameters:')
+#     print('[INFO] Teff, logg, MickyTurb, [Z]')
+#     print('[INFO]', tav, gav, xiav, zav)
+#     print('------------------------------------------------')
+#     if quiet is False:
+#         print('[INFO] Prepare for some plots!')
 
-    return (xiav, zav, gav, tav), mini
+#     return (xiav, zav, gav, tav), mini
 
 
 def contour(x, y, z, n):
