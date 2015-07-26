@@ -33,10 +33,11 @@ from scipy.io.idl import readsav
 from uncertainties import ufloat
 from uncertainties import unumpy
 
-import contfit
 import bestfit
-import resolution as res
 import cc
+import chisq
+import contfit
+import resolution as res
 
 nom = unumpy.nominal_values
 stddev = unumpy.std_devs
@@ -70,8 +71,8 @@ class ReadMod(object):
         abuns = self.par.field('ABUNS')[0]  # 19
         logg = self.par.field('GRAVS')[0]  # 9
         mt = self.par.field('TURBS')[0]  # 21
+        # Return ordered similarlaly to the grid:
         return mt, abuns, logg, teff
-        # return teff, abuns, logg, mt
 
     def parlimit(self, low, high, name):
         """Restrict a given model parameter, usually used with logg"""
@@ -109,42 +110,57 @@ class ReadMod(object):
 
 class ReadObs(object):
     """
-        ReadObs assumes a file with columns: 1. Wavelength 2-N: Spectra
+        ReadObs takes in:
+        1. File containing spectra: fspec
+        2. File containing info from spectra: fsinfo
+        3. Distance modulus of galaxy: mu
+
+        For this input it assumes the following structures:
+        fspec: 1. Wavelength 2-N: Spectra
+        fsinfo:
+        0-1: ID's:ID ID1
+        2-7: RA DEC
+        8-16: Photometry:B V R J err H err K err
+        17-18: res. err
+        19: S/N
+
+        Notes:
         If observations are normalised used self.spec,
         if not, a simple median normalisation is apllied in self.nspec
     """
-    def __init__(self, fspec, fphot, fres, fsn, mu):
+    def __init__(self, fspec, fsinfo, mu):
         self.fspec = fspec
-        self.fphot = fphot
-        self.res = fres
-        self.sn = fsn
+        self.fsinfo = fsinfo
         self.mu = mu
-        self.fall = np.genfromtxt(fspec)
-        self.wave = self.fall[:, 0]
-        self.spec = self.fall[:, 1:]
-        # trimmed:
-        # self.trim = maregion(self.wave, 1.165, 1.215)
-        # self.twave = self.wave[self.trim]
-        # self.tspec = self.spec[self.trim]
-        self.nspec = self.spec / np.median(self.spec, axis=0)
-        self.phot = np.genfromtxt(fphot)
-        self.mk = unumpy.uarray(self.phot[:, 15], self.phot[:, 16])
-        self.L = self.luminosity()
-        self.gup, self.glow = self.glimits()
-        # Should read in a text file:
-        # self.res = 3700.  # IFU 14: res at Ar1.21430: 3736 +/- 142
 
-    def glimits(self):
-        """Set gravity limits based on some good assumptions about mass"""
-        lsun = 3.846*10**26
-        l = 10**self.L * lsun
-        grav = 6.67*10**-11
-        sb = 5.67*10**-8
-        mup = 40*2*10**30
-        mlow = 8*2*10**30
-        t = 4000
-        g = lambda M, T, L: ((4*np.pi*sb*grav*M*T**4) / L)*10**2
-        return g(mup, t, l), g(mlow, t, l)
+        # Star info:
+        self.info = np.genfromtxt(self.fsinfo)
+        self.id = self.info[:, 0:2]
+        self.pos = self.info[:, 2:8]
+        self.phot = self.info[:, 8:17]
+        self.res = unumpy.uarray(self.info[:, 17], self.info[:, 18])
+        self.sn = self.info[:, 19]
+
+        self.wavenspec = np.genfromtxt(fspec)
+        self.wave = self.wavenspec[:, 0]
+        self.spec = self.wavenspec[:, 1:]
+        self.nspec = self.spec / np.median(self.spec, axis=0)
+
+        self.mk = unumpy.uarray(self.phot[:, 7], self.phot[:, 8])
+        self.L = self.luminosity()
+        # self.gup, self.glow = self.glimits()
+
+    # def glimits(self):
+    #     """Set gravity limits based on some good assumptions about mass"""
+    #     lsun = 3.846*10**26
+    #     l = (10**self.L)*lsun
+    #     bigg = 6.67*10**-11
+    #     sb = 5.67*10**-8
+    #     mup = float(40*2*10**30)
+    #     mlow = float(8*2*10**30)
+    #     t = 4000
+    #     g = lambda M, T, L: np.log10(((4*np.pi*sb*bigg*M*T**4) / L)*10**2)
+    #     return g(mup, t, l), g(mlow, t, l)
 
     def luminosity(self):
         """Calculate Luminosity based on Davies et al. (2013) correction"""
@@ -153,37 +169,39 @@ class ReadObs(object):
         l = a + b*(self.mk - self.mu)
         return l
 
-    # def readspec(self, fspec):
-    #     """Read in a set of spectra (unused)"""
-    #     sfiles = glob.glob(fspec + '/*.dat')
-    #     sfiles.sort()
-    #     wave = [None]*len(sfiles)
-    #     spec = [None]*len(sfiles)
-    #     misc = [None]*len(sfiles)
-    #     for i, j in enumerate(sfiles):
-    #         f = np.genfromtxt(j)
-    #         wave[i] = np.nan_to_num(f[:, 0])
-    #         spec[i] = np.nan_to_num(f[:, 1])
-    #         if f.shape[1] > 2:
-    #             print('[INFO] File containing spectrum contains more than'),
-    #             print('just wavelength and spectrum!')
-    #             print('[INFO] Everything else written to self.misc')
-    #         misc[i] = f[:, 2:]
-    #     return wave, spec, misc
 
+def cliptg(grid, trange, grange, l):
+    """
+        Clip the unphysical areas of the grid based on luminosity
+        Assumes a grid with axes: micro, Z, logg, Teff
+    """
+    newgrid = np.copy(grid)
+    mhigh = float(40*2*10**30)  # kg
+    mlow = float(8*2*10**30)  # kg
+    bigg = 6.67*10**-11  # m^2 s^-2 kg^-1
+    sb = 5.67*10**-8  # W m^-2 K^-4
+    lsun = float(3.846*10**26)
+    lsi = 10**l*lsun
+    gsi = 10**grange*10**-2
+    t = lambda g, M: ((g*lsi) / (4*np.pi*sb*bigg*M))**0.25
+    g = lambda T, M: np.log10(((4*np.pi*sb*bigg*M*T**4) / lsi)*10**2)
+    thigh = t(gsi, mlow)
+    tlow = t(gsi, mhigh)
+    for gi in xrange(len(thigh)):
+        trej = np.where((tlow[gi] < mod.t) & (thigh[gi] > mod.t))
+        newgrid[:, :, gi, trej] = np.nan
 
-def coarsesam(grid, samp):
-    """
-        5x in MicroTurb
-        2(.5)x in Z
-        2x in logg
-        1x in Teff
-        How do I sample 2.5x in [Z]???
-    """
-    if samp == (5, 2, 2, 1):
-        return grid[0::5, 1::2, 0::2]
-    else:
-        print('[WARNING] Sampling changed hack required in bestfit.coursesam')
+    ghigh = g(trange, mhigh)
+    glow = g(trange, mlow)
+    for ti in xrange(len(ghigh)):
+        grej = np.where((glow[ti] < mod.t) & (ghigh[ti] > mod.t))
+        newgrid[:, :, grej, ti] = np.nan
+    #     trej = np.where((tlow[6] < mod.t) & (thigh[6] > mod.t))
+    #     newgrid[:, :, i, trej] = np.nan
+
+    return newgrid
+
+# mgrid[:, :, 6, np.where(thigh[6] < mod.t)] = np.nan
 
 
 def maregion(wave, w1, w2):
@@ -199,55 +217,10 @@ def maskobs(wl):
     return ~omask
 
 
-def plotspec(owave, ospec, mwave, mspec):
-    """Plot spectra in a paper-ready way"""
-    plt.ion()
-    plt.figure()
-    plt.plot(mwave, ospec, 'black', label='Obs')
-    plt.plot(mwave, mspec, 'r', label='BF model')
-    plt.legend(loc=4)
-    plt.xlabel(r'Wavelength ($\mu$m)')
-    plt.ylabel('Norm. Flux')
-    plt.show()
-
-
 def trimspec(w1, w2, s2):
     """Trim s2 and w2 to match w1"""
     roi = np.where((w2 > w1.min()) & (w2 < w1.max()))[0]
     return w2[roi], s2[roi]
-
-lines = np.genfromtxt('lib/lines.txt')[:, 1]
-lines.sort()
-# import fit
-from lmfit.models import GaussianModel
-
-
-def maskline(wave, spec, sn):
-    """Mask regions around lines"""
-    plt.figure()
-    plt.plot(wave, spec)
-    idxall = []
-    # stderr = []
-    for l in lines:
-        wid = 0.0005  # microns
-        idx = np.where((wave > l - wid) & (wave < l + wid))[0]
-        x = wave[idx]
-        y = spec[idx]*-1 + 1.
-        # guess = [0.0001, l, 0.0001]  # amp, cen, wid
-        # robs = fit.fitline(x, y, np.sqrt(y), guess)
-        mod = GaussianModel()
-        pars = mod.guess(y, x=x, weights=1/sn)
-        out = mod.fit(y, pars, x=x, weights=1/sn)
-        print(out.fit_report(min_correl=0.25))
-        # plt.figure()
-        # plt.plot(x, out.best_fit*-1. + 1.)
-        wid = out.values.values()[1]*3  # 3*FWHM
-        idx = np.where((wave > l - wid) & (wave < l + wid))[0]
-        plt.plot(wave[idx], spec[idx])
-        idxall.append(idx)
-        # stderr.append(out.params.values()[3].stderr)
-        # print(spec[idx])
-    return idxall
 
 
 def defidx(w1):
@@ -259,6 +232,18 @@ def defidx(w1):
     idx.append(np.where((w1 > 1.20986) & (w1 < 1.21078))[0])
     return idx
 
+
+# def plotspec(owave, ospec, mwave, mspec):
+#     """Plot spectra in a paper-ready way"""
+#     plt.ion()
+#     plt.figure()
+#     plt.plot(mwave, ospec, 'black', label='Obs')
+#     plt.plot(mwave, mspec, 'r', label='BF model')
+#     plt.legend(loc=4)
+#     plt.xlabel(r'Wavelength ($\mu$m)')
+#     plt.ylabel('Norm. Flux')
+#     plt.show()
+
 # Start the proceedings:
 print('[INFO] Reading in model grid ...')
 then = time.time()
@@ -266,6 +251,27 @@ mod = ReadMod(
     'models/MODELSPEC_2013sep12_nLTE_R10000_J_turb_abun_grav_temp-int.sav')
 t1 = time.time() - then
 print('[INFO] Time taken in seconds:', t1)
+
+print('[INFO] Read observed spectra from file:')
+print('[INFO] Please ensure all files are ordered similarly!')
+n6822 = ReadObs('../ngc6822/Spectra/N6822-spec-24AT.v2-sam.txt',
+                'input/NGC6822-janal-input.txt', mu=ufloat(23.3, 0.05))
+
+# Prep:
+print('[INFO] Observations and models trimed to the 1.165-1.215mu region')
+owave, ospec = trimspec(mod.twave, n6822.wave, n6822.nspec)
+ospec = ospec.T
+
+# ############################################################################
+# Set up tests:
+# Using fake spectra, which have been chose to roughly represent the
+# NGC6822, lmc and NGC300 data ... also just some made up ones at the end
+# Test1
+# The simplist test I can think of:
+# Does the analysis recover the parameters of a model?
+
+# Bestfit mod from Ben to comapre the fits to:
+# r10bf = np.genfromtxt('../ngc6822/fits/bestfit/specfit_N6822_24AT_v1_30.dat')
 
 # Fake spectra:
 mrsg01 = mod.tgrid[12, 3, 4, 4]
@@ -292,102 +298,48 @@ n300134 = mod.tgrid[20, 9, 3, 10]
 f1 = mod.tgrid[13, 12, 3, 6]
 f2 = mod.tgrid[14, 14, 6, 5]
 f3 = mod.tgrid[14, 18, 6, 5]
-
-# Real spectra
-# Trim to match models:
-print('[INFO] Read observed spectra from file:')
-print('[INFO] Please ensure all files are ordered similarly!')
-# n6822 = ReadObs('../ngc6822/Spectra/N6822-spec-24AT.v1.txt')
-n6822res = np.genfromtxt('../ngc6822/Catalogues/N6822-cat-res.txt')[:, 2]
-
-# Giving the class files assumes that the files will be standardised!
-# Better option would be to give the class the spectra and photometry
-n6822 = ReadObs('../ngc6822/Spectra/N6822-spec-24AT.v2-sam.txt',
-                '../ngc6822/Photometry/N6822-phot-KMOS-sam-err.txt', n6822res,
-                [150]*len(n6822res), mu=ufloat(23.3, 0.05))
-n6822.sn[1] = 120
-n6822.sn[4] = 103
-n6822.sn[-1] = 104
-
-# Prep:
-print('[INFO] Observations and models trimed to the 1.165-1.215mu region')
-owave, ospec = trimspec(mod.twave, n6822.wave, n6822.nspec)
-# Select first 4 for speed
-ospec = ospec.T[0:]
-# Mask the observations
-omask = maskobs(owave)
-
-# Bestfit mod from Ben:
-# r10bf = np.genfromtxt('../ngc6822/fits/bestfit/specfit_N6822_24AT_v1_30.dat')
-# Fix 2 parameters:
-# Micro & logg
-# fixi = ((12, 4), (12, 6), (15, 4), (15, 6), (10, 7),
-#         (13, 4), (13, 3), (16, 2), (12, 2), (), ())
-# # Input parameters for Z & teff
-# fixin = ((3, 4), (1, 4), (7, 5), (3, 6), (3, 5), (5, 6),
-#          (2, 5), (4, 5), (7, 5), (), ())
-# Reverse the parameters:
-# Fix Z & teff
-# fixi = ((3, 4), (1, 4), (7, 5), (3, 6), (3, 5), (5, 6),
-#         (2, 5), (4, 5), (7, 5))
-# # Input parameters for Micro & logg
-# fixin = ((12, 4), (12, 6), (15, 4), (15, 6), (10, 7),
-#          (13, 4), (13, 3), (16, 2), (12, 2))
-
-# fixi = ((15, 4), (13, 4), (16, 2))
-
-# Using models instead of observations
 # Tests 1 & 2
 # mspec = [mrsg01, mrsg02]
 mspec = [mrsg01, mrsg02, mrsg04, mrsg07, mrsg08,
          mrsg09, mrsg10, mrsg11, mrsg14, mrsg17, mrsg18,
          lmc05, lmc07, n300010, n300022, n300037, n300126, n300134,
          f1, f2, f3]
+nlevel = 0.01
 # mspec = [mrsg02]*10
+
+# Test 1:
 # owave = mod.twave  # test 1
-# omask = maskobs(owave)
-# # mrsg01 = mod.tgrid[12, 3, 4, 4]
+# msize = mod.tgrid.shape[-1]  # test 1
+# noise = np.random.normal(0, nlevel, (msize, np.shape(mspec)[0]))  # test 1
+# ospec = mspec + noise.T  # test 1
+# mdeg = mod.tgrid  # test 1
+
 # Test 2:
 # Degrade & Resample:
 # osam = contfit.specsam(mod.twave, mspec, owave)
 # odeg = res.degrade(owave, osam, float(mod.res), float(n6822.res[0]))
 # Noise added after degrading and resampling
-nlevel = 0.01
-# msize = mod.tgrid.shape[-1]  # test 1
-msize = np.shape(owave)[0]  # test 2
-# noise = np.random.normal(0, nlevel, (msize, np.shape(mspec)[0]))  # test 1
+# msize = np.shape(owave)[0]  # test 2
 # noise = np.random.normal(0, nlevel, (msize, np.shape(odeg)[0]))  # test 2
-# ospec = mspec + noise.T  # test 1
-# mdeg = mod.tgrid  # test 1
 # ospec = odeg + noise.T  # test 2
-
-# fixout = np.zeros(np.shape(fixi)).astype(int)
-# In this for loop we need more than one spectrum! -- change this!
+# ############################################################################
 
 print('[INFO] Resampling model grid ...')
 then = time.time()
 mssam = contfit.specsam(mod.twave, mod.tgrid, owave)
 print('[INFO] Time taken in seconds:', time.time() - then)
+
+# ############################################################################
 # Test2:
 # print('[INFO] Degrading model grid ...')
 # then = time.time()
 # resi = float(n6822.res[0])
 # mdeg = res.degrade(owave, mssam, float(mod.res), resi)
 # print('[INFO] Time taken in seconds:', time.time() - then)
-# -----------
-# for i in bfclass:
-#     print i.fipar
-#     minidx = np.unravel_index(np.argmin(i.fchi), i.fchi.shape)
-#     # print minidx
-#     for i, j in enumerate(minidx):
-#         print mod.head[0][i][j],
-#     print
-# # Get mean parameters and errors from multiple runs:
-# [(np.mean(full[i::15], axis=0), np.std(full[i::15], axis=0)) for i in xrange(15)]
+# ############################################################################
+# In this for loop we need more than one spectrum! -- change this!
 
-# -----------
 bfclass = []
-params = np.zeros((np.shape(ospec)[0], 4))
 chi = ([0]*np.shape(ospec)[0])
 mscale = ([0]*np.shape(ospec)[0])
 cft = ([0]*np.shape(ospec)[0])
@@ -396,9 +348,10 @@ for i, j in enumerate(ospec):
     print('[INFO] Degrading model grid ...')
     then = time.time()
     # resi = 10000  # test 1
-    # resi = float(n6822.res[0])  # test 2
-    sn = n6822.sn[i]
-    resi = float(n6822.res[i])  # test 3
+    # resi = float(nom(n6822.res[0]))  # test 2
+    # clip s/n at 150.
+    sn = 150. if n6822.sn[i] >= 150. else n6822.sn[i]
+    resi = float(nom(n6822.res[i]))  # test 3
     mdeg = res.degrade(owave, mssam, float(mod.res), resi)  # test 3
     print('[INFO] Time taken:', round(time.time() - then, 3), 's')  # test3
 
@@ -408,84 +361,38 @@ for i, j in enumerate(ospec):
     ospeccc[i] = spec
     # Using diag. lines only:
     idx = defidx(owave)  # test 2 & 3
-    # idx = maskline(owave, spec, sn)  # test 2 & 3
-    # idx = maskline(mod.twave, spec, sn)  # Model at mod. resolution
-    mgrid = mdeg
+    mgrid = cliptg(mdeg, mod.t.astype(float), mod.g, nom(n6822.L[0]))
     owavem = owave
-    # Using entire region with masks
-    # Mask model spectra
-    # mgrid = mdeg[:, :, :, :, omask]
-    # spec = spec[omask]
-    # owavem = owave[omask]
 
     print('[INFO] Compute chi-squared grid ...')
     then = time.time()
     # Need to pass the the model grid and a observed spectrum class:
-    # chi, mscale, cft = bestfit.chigrid(mgrid, spec, owavem, resi)
-    # chi[i], mscale[i], cft[i] = bestfit.chigrid(mgrid, spec, owavem, resi)
-    # chi, mscale, cft = bestfit.chigrid(mgrid, spec, owavem, resi, idx, sn)
-    chi[i], mscale[i], cft[i] = bestfit.chigrid(mgrid, spec, owavem, resi, idx, sn)
-    # chi, oscale, cft = bestfit.chigrid(mgrid, spec, owavem, 10000)
+    chi[i], mscale[i], cft[i] = chisq.chigrid(mgrid, spec, owavem,
+                                              resi, idx, sn)
     chii = chi[i]  # / 8.
-    # chii = chi
-    vchi = np.ma.masked_where(chii == 0.0, chii, copy=False)
     print('[INFO] Time taken in seconds:', time.time() - then)
 
     # Constrain the grid to reject unphysical log g's
     # -0.25 should be the step between grid values
-    # glow = np.log10(nom(n6822.glow[1])) - 0.25
-    # gup = np.log10(nom(n6822.gup[1])) + 0.25
-    glow = np.log10(nom(n6822.glow[i])) - 0.25  # test3
-    gup = np.log10(nom(n6822.gup[i])) + 0.25  # test3
-    mod.parlimit(glow, gup, 'GRAVS')
-    vfchi = vchi[:, :, mod.parcut]
-    # Filter coarse grid:
-    vcoarse = coarsesam(vchi, (5, 2, 2, 1))
-    # Constrain coarse grid:
-    # gcoarse = (mod.g[mod.parcut][0] <= mod.g[0::2]) & \
-    #           (mod.g[mod.parcut][-1] >= mod.g[0::2])
-    # vcchi = vcoarse[:, :, gcoarse]
-    # No g-range restrictions
-    # vfchi = vchi
-    vcchi = vcoarse
+    gstep = np.abs(mod.g[0] - mod.g[1])
+    # glow = nom(n6822.glow[1]) - 0.25
+    # gup = nom(n6822.gup[1]) + 0.25
+    # glow = nom(n6822.glow[i]) - gstep - 0.3  # test3
+    # gup = nom(n6822.gup[i]) + gstep  # test3
+    # mod.parlimit(glow, gup, 'GRAVS')
+    # vfchi = chii[:, :, mod.parcut]
+    vfchi = chii
     print('------------------------------------')
     print('[INFO] Calcualte bestfit parameters ...')
     then = time.time()
-    bfobj = bestfit.BestFit(vfchi, vcchi, mod.head)
-    # bfobj.showinit()
+    bfobj = bestfit.BestFit(vfchi, mod.head)
+    bfobj.showmin()
     # bfobj.showfin()
     print('[INFO] Time taken in seconds:', time.time() - then)
     print('------------------------------------')
-    params[i] = bfobj.bf
     bfclass.append(bfobj)
-    # fixout[i] = bestfit.fix2(vchi[fixi[i][0], :, fixi[i][1]],
-    #                          mod.par[0][0], mod.par[0][1], 'Teff', '[Z]')
-    # fixout[i] = bestfit.fix2(vchi[:, fixi[i][0], :, fixi[i][1]],
-    #                          mod.par[0][2], mod.par[0][3])
-    # Plot the bestfit model to the observed data:
-    # Have to change the order of bfobs.min w.r.t the grid!!!
 
-    # bfspec = mod.grid[bfobj.min[0, 0], bfobj.min[1, 0],
-    #                   bfobj.min[2, 0], bfobj.min[3, 0]]
-    # bfspec = mgrid[bfobj.min[3, 0], bfobj.min[1, 0],
-    #                bfobj.min[2, 0], bfobj.min[0, 0]]
-    # plotspec(owavem, spec, mod.wave, bfspec)
-# -----------
 bfspec = [mscale[i][j.fi] for i, j in enumerate(bfclass)]
-
-# tout, zout = np.column_stack(fixout)
-# tin, zin = np.column_stack(fixin)
-# mtout, gout = np.column_stack(fixout)
-# mtin, gin = np.column_stack(fixin)
-
-# plt.scatter(bfobj.prange[0][tin], bfobj.prange[0][tout])
-# f, ax = plt.subplots(1, 2)
-# ax[0].scatter(bfobj.prange[0][tin], bfobj.prange[0][tout])
-# ax[0].set_xlabel('Teff In')
-# ax[0].set_ylabel('Teff Out')
-# ax[1].scatter(bfobj.prange[1][zin], bfobj.prange[1][zout])
-# ax[1].set_xlabel('[Z] In')
-# ax[1].set_ylabel('[Z] Out')
 
 # End game
 t = time.gmtime()
@@ -534,20 +441,20 @@ def wparams(grid):
     #     print(wpars[i], np.sqrt(tmp))
     return wpars
 
-x = np.zeros((len(n6822.glow), 4))
-errx = np.zeros((len(n6822.glow), 4))
-for i in xrange(len(n6822.glow)):
-    glow = np.log10(nom(n6822.glow[i])) - 0.25  # test3
-    gup = np.log10(nom(n6822.gup[i])) + 0.25  # test3
-    mod.parlimit(glow, gup, 'GRAVS')
-    x[i] = wparams(bfclass[i].fchi)
-    test1 = np.ma.masked_greater_equal(bfclass[i].fchi, bfclass[i].fchi.min() + 3.)
-    m = np.array(np.where(~test1.mask))
-    print(m.shape)
-    errx[i] = [np.std(mod.head[0][k][l]) for k, l in enumerate(m)]
-    maxi = [mod.head[0][k][l].max() for k, l in enumerate(m)]
-    mini = [mod.head[0][k][l].min() for k, l in enumerate(m)]
-    print(maxi, mini)
+# x = np.zeros((len(n6822.glow), 4))
+# errx = np.zeros((len(n6822.glow), 4))
+# for i in xrange(len(n6822.glow)):
+#     glow = np.log10(nom(n6822.glow[i])) - 0.25  # test3
+#     gup = np.log10(nom(n6822.gup[i])) + 0.25  # test3
+#     mod.parlimit(glow, gup, 'GRAVS')
+#     x[i] = wparams(bfclass[i].vchi)
+#     test1 = np.ma.masked_greater_equal(bfclass[i].fchi, bfclass[i].fchi.min() + 3.)
+#     m = np.array(np.where(~test1.mask))
+#     print(m.shape)
+#     errx[i] = [np.std(mod.head[0][k][l]) for k, l in enumerate(m)]
+#     maxi = [mod.head[0][k][l].max() for k, l in enumerate(m)]
+#     mini = [mod.head[0][k][l].min() for k, l in enumerate(m)]
+#     print(maxi, mini)
 
 
 def bestfitoned():
@@ -592,10 +499,6 @@ def plot2(r1, in1, out1, n1, r2, in2, out2, n2):
     ax[1].set_xlabel(n2 + ' In')
     ax[1].set_ylabel(n2 + ' Out')
 
-# plot2(bfobj.prange[2], gin, gout, 'log g',
-#       bfobj.prange[3], mtin, mtout, 'MicroTurb')
-# plot2(bfobj.prange[1], tin, tout, 'Teff',
-#       bfobj.prange[0], zin, zout, '[Z]')
 
 # Unfinished:
 # Errors:
@@ -608,29 +511,15 @@ def plot2(r1, in1, out1, n1, r2, in2, out2, n2):
 
 # def err(mspec, mgrid, owave, ores):
 #     """
-#         Need to pass this everything that bestfit.chigrid needs
+#         Need to pass this everything that chisq.chigrid needs
 #     """
 #     epar = np.zeros((10, 4))
 #     for i in xrange(10):
 #         nmod = mspec + np.random.normal(0, 0.01, mspec.shape[0])
-#         echi, eoscale = bestfit.chigrid(mgrid, nmod, owave, ores)
+#         echi, eoscale = chisq.chigrid(mgrid, nmod, owave, ores)
 #         epar[i] = bestfit.bf(echi, mod.par, quiet=True)
 #     return epar
 
 # then = time.time()
 # epar = err(mraw, mod.grid, mod.wave, mod.res)
 # print('[INFO] Time taken in seconds:', time.time() - then)
-
-
-def errper(a):
-    low = np.percentile(a, 15.9)
-    high = np.percentile(a, 84.1)
-    (high - low) / 2.
-
-# Just to get us started, crudely take the std:
-# et, eg, exi, ez = np.round(np.std(epar, axis=0), 3)
-# print('------------------------------------')
-# print('[INFO] Bestfit parameters:')
-# print('------------------------------------')
-# print(tav, '+/-', et, gav, '+/-', eg, xiav, '+/-', exi, zav, '+/-', ez)
-# print('------------------------------------')

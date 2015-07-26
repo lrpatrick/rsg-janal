@@ -5,7 +5,10 @@
     Cross-correlation module, stolen and slightly ammended from an
     IDL conversion
 """
+from __future__ import print_function
+
 import numpy as np
+
 from scipy.interpolate import UnivariateSpline
 
 
@@ -42,12 +45,12 @@ def ccshift(s1, s2, x1, shift1=None, width=None, quiet=True):
         # Test to make sure correlation has worked
         shift2, corr_array2 = crossc(s1, s2cc)
         if quiet is False:
-            print '[INFO] Output from ccshift'
-            print '[INFO] Cross-Correlation shift = ', shift1
-            print '[INFO] After correction shift = ', shift2
+            print('[INFO] Output from ccshift')
+            print('[INFO] Cross-Correlation shift = ', shift1)
+            print('[INFO] After correction shift = ', shift2)
         if abs(shift2) > abs(shift1):
-            print '[WARNING] Cross-Correlation not effective.'
-            print '[WARNING] No correction applied'
+            print('[WARNING] Cross-Correlation not effective.')
+            print('[WARNING] No correction applied')
             return s2, 0.0
         else:
             return s2cc_fin, shift1
@@ -56,7 +59,7 @@ def ccshift(s1, s2, x1, shift1=None, width=None, quiet=True):
         """Implement shift and interpolate s2 onto s1"""
         # Define the xaxis step:
         step = np.abs(x1[1] - x1[0])
-        xcorr = x1 + shift1 * step
+        xcorr = x1 + shift1*step
 
         s2_mod = UnivariateSpline(x1, s2, s=0.)
         s2_corr = s2_mod(x1)
@@ -145,10 +148,10 @@ def crossc(s1, s2, ishift=None, width=None, i1=None, i2=None):
     nt = it2_end - it2_start + 1
 
     if nt < 1.0:
-        print '[WARNING]',
-        print 'modules.crossc',
-        print 'Exception: region too small, ',
-        print 'width too large, or ishift too large'
+        print('[WARNING]', end=' ')
+        print('modules.crossc', end=' ')
+        print('Exception: region too small, ', end=' ')
+        print('width too large, or ishift too large')
         # raise Exception("cross correlate - region too small,
         # width too large, or ishift too large")
 
@@ -156,7 +159,7 @@ def crossc(s1, s2, ishift=None, width=None, i1=None, i2=None):
 
     corr = np.zeros((width))
     mean2 = template2.sum() / nt
-    sig2 = np.sqrt(np.sum((template2 - mean2) ** 2))
+    sig2 = np.sqrt(np.sum((template2 - mean2)**2))
     diff2 = template2 - mean2
 
     for i in xrange(width):
@@ -164,32 +167,32 @@ def crossc(s1, s2, ishift=None, width=None, i1=None, i2=None):
         it1_end = it1_start + nt - 1
         template1 = s1[it1_start:(it1_end + 1)]
         mean1 = template1.sum() / nt
-        sig1 = np.sqrt(np.sum((template1 - mean1) ** 2))
+        sig1 = np.sqrt(np.sum((template1 - mean1)**2))
         diff1 = template1 - mean1
 
         if (sig1 == 0) or (sig2 == 0):
-            print '[WARNING]',
-            print 'modules.crossc',
-            print 'Exception: zero variance computed'
+            print('[WARNING]', end=' ')
+            print('modules.crossc', end=' ')
+            print('Exception: zero variance computed')
             # raise Exception("cross correlate - zero variance computed")
 
-        corr[i] = np.sum(diff1 * diff2) / (sig1 * sig2)
+        corr[i] = np.sum(diff1*diff2) / (sig1*sig2)
 
     # maxc = corr.max()
     k = np.where(corr == corr.max())
     k = k[0][0]
 
     if (k == 0) or (k == (width - 1.0)):
-        print '[WARNING]',
-        print 'modules.crossc',
-        print 'Exception: maximum on edge of search area'
+        print('[WARNING]', end=' ')
+        print('modules.crossc', end=' ')
+        print('Exception: maximum on edge of search area')
         offset = 0.
         corr = 0.
         return (offset, corr)
         # raise Exception("cross correlate - maximum on edge of search area")
 
     kmin = (corr[k - 1] - corr[k]) / \
-        (corr[k - 1] + corr[k + 1] - 2.0 * corr[k]) - 0.5
+        (corr[k - 1] + corr[k + 1] - 2.0*corr[k]) - 0.5
     offset = k + kmin - width2 + approx
 
     return (offset, corr)

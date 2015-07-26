@@ -1,0 +1,18 @@
+# Author: LRP
+# Date: 28-05-2015
+# Model spectra at observed resolution & sampling
+# Noise level: 0.01
+# Output parameters using only the 8 diag. lines
+# RSG1 RSG2 RSG4 RSG7 RSG8 RSG9 RSG10 RSG11 RSG14 RSG17 RSG18
+# Micro  abuns  logg  teff
+3.2 -0.7 -0.25 3800
+3.2 -0.8 0.25 3800
+4.0 -0.1 0.25 3900
+4.0 -0.6 0.5 4000
+2.8 -0.7 0.25 3800
+3.6 -0.4 0.0 4000
+3.4 -0.6 -0.25 3900
+4.2 -0.5 -0.5 3900
+3.4 -0.2 -0.5 3900
+3.0 -0.5 -0.25 3900
+2.4 -0.7 0.5 3800

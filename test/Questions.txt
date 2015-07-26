@@ -1,0 +1,30 @@
+Author: LRP
+Date: 31-03-2015
+Description: Queries about the RSG J-Analysis
+
+For Ben:
+Questions:
+1.  What is sigma in equation 1 of Davies et al. 2015 (MC stuff)?
+    "error on the line-strength, determined by the S/N" Davies et al. 2015
+    "line strenght == continuum - central line depth"   Davies et al. 2015
+    "associated error spectrum" Zach's thesis
+    Ben:
+"I fit a gaussian to the line profile, including the error spectrum as
+the measurement errors, and the error on the peak I get back is the
+error on the line strength. Make sense?"
+
+
+
+For me:
+
+1. Do the errors increase when the noise in a model is increased?
+    -- errors increase slightly ...
+    -- The contours on all of the parameters increase
+
+2. Where in the parameter space can we recover the parameters?
+    -- Sometimes we get +/- 0.0 for errors from repeating the fit 10 times
+
+3. Occasionally switching off the continuum fitting procedure changes the fit values
+    -- For the majority of stars this does not change the parameters
+    -- Individual cases where it does change parameters:
+        -- RSG7: Parameters very close to edge of grid i.e. combination of mt = 3.0 & logg = 0.75

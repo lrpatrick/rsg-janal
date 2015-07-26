@@ -1,0 +1,19 @@
+# Author: LRP
+# Date: 02-04-2015
+# Description:
+# Output parameters for fits, inputs stored in RSGinput.txt
+# Run with models at the model resolution and sampling
+# i.e. no resampling or degrading within the routines
+# Continuum fitting is disabled in these fits
+# ... for some reason these are in reverse order:
+# RSG14, 11, 10, 9, 8, 7, 4, 2, 1
+# Micro, abuns, logg, teff
+3.6 -0.466667 0.0833333 4033.33333333
+3.2 -0.933333 0.0833333 3733.33333333
+4.0 -0.2 0.0 3900.0
+4.0 -0.6 0.5 4000.0
+2.8 -0.666667 0.583333 3833.33333333
+3.6 -0.466667 0.0833333 4033.33333333
+3.6 -0.666667 0.0833333 3933.33333333
+4.13333 -0.5 -0.416667 3900.0
+3.13333 -0.633333 -0.25 3733.33333333

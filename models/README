@@ -1,0 +1,17 @@
+# Author: LRP
+# Date: 22-01-2015
+# Description:
+
+README file for RSG-JAnal/models
+
+Folder containing all the necessary models to run the analysis.
+
+It looks like these files will all be .sav (IDL) binary files ...
+
+Structure of this file
+
+modgrid = mod['modelspec'][0][0]
+
+pranges = mod['modelspec'][0][1]
+
+xaxis = mod['modelspec'][0][2]

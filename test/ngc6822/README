@@ -1,0 +1,24 @@
+Author: LRP
+Date: 26-05-2015
+README file to describe tests undertaken
+
+Three main tests:
+1. Using a model as input spectrum at model resolution and sampling
+i.e. fit model to model
+
+2. Using a model at the resolution and sampling of the observed ngc6822 spectra
+
+3. Using the real data
+
+For tests 1 & 2 use a wide range of model input, from NGC6822, NGC300, LMC,
+SMC, etc. As many real stars as I can get parameters for!
+Make sure I test the algorithm across the all of parameter space.
+
+Results:
+1. By taking the min() of the chisq-array we recover the parameters exactly
+  -- This uses a just the NGC6822 stars
+
+2. Using the same small sample we recover parameters exactly.
+  -- Increasing noise gives results, see fullreg-test2v3.png with small noise
+     and fullreg-test2v2.png with a larger noise level
+

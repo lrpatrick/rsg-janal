@@ -1,0 +1,18 @@
+# Author: LRP
+# Date: 26-05-2015
+# Output parameters for NGc6822 data
+# parameters found using the min of the chisq grid
+# and sampling.
+# Parameters are recovered exactly!
+# Micro  abuns  logg  teff
+3.4 -0.6 -0.25 3800
+3.4 -1.0 0.0 3800
+4.0 -0.4 0.0 3900
+4.0 -0.6 0.5 4000
+2.8 -1.0 0.0 3800
+3.8 -0.5 -0.25 3900
+4.0 -0.6 0.0 3900
+4.6 -0.3 0.5 4000
+4.4 -0.1 0.5 4000
+3.0 -0.7 -0.25 3800
+2.0 -1.0 0.25 3600
