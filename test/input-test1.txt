@@ -1,9 +1,0 @@
-# Author: LRP
-# Date: 20-04-2015
-# Input parameters for models
-# No resampling, degrading or contfitting
-# RSG4, RSG9, RSG11
-# Micro, abuns, logg, teff
-4.0 -0.2 0.0 3900
-3.6 -0.4 0.0 4000
-4.1999998 -0.5 -0.5 3900
