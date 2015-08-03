@@ -63,7 +63,7 @@ def ccshift(s1, s2, x1, shift1=None, width=None, quiet=True):
 
         s2_mod = UnivariateSpline(x1, s2, s=0.)
         s2_corr = s2_mod(x1)
-        # Now interpolate back onto original axis
+        # Interpolate back onto original axis
         s2_corr_mod = UnivariateSpline(xcorr, s2_corr, s=0.)
         s2cc_fin = s2_corr_mod(x1)
         return s2cc_fin
@@ -77,11 +77,7 @@ def ccshift(s1, s2, x1, shift1=None, width=None, quiet=True):
 
     else:
         s2cc_fin = shiftnint()
-        # s2cc_fin = shiftnint(x1, shift1, s1, s2)
         return s2cc_fin, shift1
-
-    # s2cc_fin = checkshifts(s2, s2cc_fin, shift1, shift2)
-    # return s2cc_fin, shift1
 
 
 def crossc(s1, s2, ishift=None, width=None, i1=None, i2=None):

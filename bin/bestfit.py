@@ -46,10 +46,6 @@ class BestFit(object):
         mtv, zv, gv, tv = np.meshgrid(self.prange[0], self.prange[1],
                                       self.prange[2], self.prange[3],
                                       indexing='ij')
-        # np.average(mtv, weights=np.exp(-vfchi/2))
-        # # To recover parameters:
-        # mtv[14, 18, 6, 5], zv[14, 18, 6, 5],
-        # gv[14, 18, 6, 5], tv[14, 18, 6, 5]
         n = 1000
         bftop5 = self.bestfew(n)
         mttop, ztop, gtop, \

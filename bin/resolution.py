@@ -13,7 +13,6 @@ Gazak (2014) Thesis
 
 """
 
-# Modules:
 import numpy as np
 import sys
 
@@ -68,44 +67,3 @@ def degrade(wl, f, rin, rout):
         ff[i] = np.sum(f*kern, axis=len(f.shape) - 1)
         # ff[:, :, :, :, indx] = np.sum(f*kern, axis=len(f.shape) - 1)
     return ff
-
-
-def res(wave, spec):
-    """
-        Measure the spectral resolution of a given spectrum.
-        How to implement this?
-         - Sky lines?
-         - stellar features at this resolution will be blends
-         - Arc lamp flats?
-         - Is there an effective way to measure this?
-    """
-    r = 0.
-    return r
-
-# Either fit or find the resolution for each spectrum and then go through
-# compareres
-
-
-def compareres():
-    """
-        Compare derived resolution with given resolution
-        If the two are significantly different, flag this and fit!
-
-    """
-    return
-
-
-def findres():
-    """
-        Find resolution for spectrum
-        -- Use det_wave_img.fits to find the approx. resolution for each star
-        -- Use a lookup table to match spectra with IFU number
-    """
-
-
-def fitres():
-    """
-        Fit for the spectral resolution
-
-    """
-    return

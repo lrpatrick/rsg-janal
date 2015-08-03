@@ -46,9 +46,6 @@ def chiprep(ospec, owave, ores, mspec, idx, snr):
 
 def chicalc(owave, ospec, mspec, idx, snr):
     """Calculate chisq for each line"""
-    # chi = 0.0
-    # for i in idx:
-    #     chi += chisq(ospec[i], 1. / snr, mspec[i]) / len(i)
     chi = np.sum([chisq(ospec[i], 1. / snr, mspec[i]) / len(i) for i in idx])
     return chi
 

@@ -34,7 +34,7 @@ class ReadMod(object):
         self.wave = self.all['modelspec'][0][2]
         self.pnames = self.par.dtype.names
         self.head = self.changehead()
-        self.res = 10000.
+        self.res = float(10000.)
         self.mt, self.z, self.g, self.t = self.gridorder()
         self.trim = maregion(self.wave, 1.165, 1.215)
         self.tgrid = self.grid[:, :, :, :, self.trim]
@@ -94,11 +94,10 @@ class ReadObs(object):
         For this input it assumes the following structures:
         fspec: 1. Wavelength 2-N: Spectra
         fsinfo:
-        0-1: ID's:ID ID1
-        2-7: RA DEC
-        8-16: Photometry:B V R J err H err K err
-        17-18: res. err
-        19: S/N
+        0: ID
+        1-9: Photometry:B V R J err H err K err
+        10-11: res. err
+        12: S/N
 
         Notes:
         If observations are normalised used self.spec,
@@ -112,9 +111,9 @@ class ReadObs(object):
         # Star info:
         self.info = np.genfromtxt(self.fsinfo)
         self.id = self.info[:, 0]
-        # self.pos = self.info[:, 2:8]
         self.phot = self.info[:, 1:10]
-        self.res = unumpy.uarray(self.info[:, 10], self.info[:, 11])
+        self.res = self.info[:, 10]
+        self.eres = self.info[:, 11]
         self.sn = self.info[:, 12]
 
         self.wavenspec = np.genfromtxt(fspec)
@@ -125,18 +124,6 @@ class ReadObs(object):
         self.mk = unumpy.uarray(self.phot[:, 7], self.phot[:, 8])
         self.L = self.luminosity()
         # self.gup, self.glow = self.glimits()
-
-    # def glimits(self):
-    #     """Set gravity limits based on some good assumptions about mass"""
-    #     lsun = 3.846*10**26
-    #     l = (10**self.L)*lsun
-    #     bigg = 6.67*10**-11
-    #     sb = 5.67*10**-8
-    #     mup = float(40*2*10**30)
-    #     mlow = float(8*2*10**30)
-    #     t = 4000
-    #     g = lambda M, T, L: np.log10(((4*np.pi*sb*bigg*M*T**4) / L)*10**2)
-    #     return g(mup, t, l), g(mlow, t, l)
 
     def luminosity(self):
         """Calculate Luminosity based on Davies et al. (2013) correction"""
@@ -163,14 +150,14 @@ def cliptg(grid, trange, grange, l):
     g = lambda T, M: np.log10(((4*np.pi*sb*bigg*M*T**4) / lsi)*10**2)
     thigh = t(gsi, mlow)
     tlow = t(gsi, mhigh)
-    for gi in xrange(len(thigh)):
-        trej = np.where((tlow[gi] < trange) & (thigh[gi] > trange))
+    for gi in xrange(len(grange)):
+        trej = np.where((tlow[gi] < trange) & (thigh[gi] < trange))
         newgrid[:, :, gi, trej] = np.nan
 
     ghigh = g(trange, mhigh)
     glow = g(trange, mlow) - 0.3
-    for ti in xrange(len(ghigh)):
-        grej = np.where((glow[ti] < trange) & (ghigh[ti] > trange))
+    for ti in xrange(len(trange)):
+        grej = np.where((glow[ti] < grange) & (ghigh[ti] < grange))
         newgrid[:, :, grej, ti] = np.nan
 
     return newgrid

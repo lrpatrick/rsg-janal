@@ -1,8 +1,18 @@
-# Author: LRP
-# Date: 22-01-2015
-# Description
+Author: LRP
+Date: 22-01-2015
+Description
 
 README file for RSG-JAnal/bin
 
-Folder containing all recipes to run the software (fill in the names when I
-have them!!!)
+Folder containing all recipes to run the J-band analysis routines:
+
+bin/bestfit.py
+bin/cc.py
+bin/chisq.py
+bin/contfit.py
+bin/readdata.py
+bin/resolution.py
+
+bin/fit.py       -- unused
+bin/wrap.py      -- unused
+
