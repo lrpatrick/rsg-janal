@@ -50,7 +50,7 @@ class BestFit(object):
         # # To recover parameters:
         # mtv[14, 18, 6, 5], zv[14, 18, 6, 5],
         # gv[14, 18, 6, 5], tv[14, 18, 6, 5]
-        n = 100
+        n = 1000
         bftop5 = self.bestfew(n)
         mttop, ztop, gtop, \
             ttop, chival = np.array([(mtv[i], zv[i], gv[i], tv[i],

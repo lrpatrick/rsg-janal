@@ -36,7 +36,7 @@ def chiprep(ospec, owave, ores, mspec, idx, snr):
     """Prep for chisq calculation
         This function could take in a oclass and mspec
     """
-    cft = contfit.contfit(ores, owave, mspec, ospec)
+    cft = contfit.contfit(ores, owave, mspec, ospec)[0]
     mscale = mspec / cft(owave)
     mcc, shift = cc.ccshift(ospec, mscale, owave)
     # Calculate Chisq

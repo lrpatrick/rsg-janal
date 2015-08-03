@@ -114,31 +114,31 @@ def contfit(res, wave, mspec, ospec):
         print '[WARNING] Resolution greater than 10000!'
         print '[WARNING] As of Feburary 2015 model resolution is 10000'
 
-    # Constants for all models:
     # Define continuum width
     s = 1.0
     cw = 1.20*s / res
-    n = np.round((cw / (wave[1] - wave[0])), 0).astype(int)
+    n = np.ceil((cw / (wave[1] - wave[0]))).astype(int)
+    # print(n)
     # Identify 'continuum' points and remove outliers
     y = np.arange(0, ospec.shape[0], n)
-    midx = np.array([x + np.argmax(mspec[x:x + n]) for x in y])
-    # c1 = np.column_stack((wave[midx], mspec[midx]))
-    sig1 = wave[midx].std()
-    wmax = wave[midx]
-    c2idx = midx[np.where(np.abs(wmax - np.median(wmax)) < 3*sig1)[0]]
+    c1idx = np.array([x + np.argmax(mspec[x:x + n]) for x in y])
+    # c1 = np.column_stack((wave[c1idx], mspec[c1idx]))
+    sig1 = mspec[c1idx].std()
+    mcont = mspec[c1idx]
+    c2idx = c1idx[np.where(np.abs(mcont - np.mean(mcont)) < 3*sig1)[0]]
 
     # Correction function:
     # Take ratio at 'continuum' points:
-    r2 = mspec[c2idx] / ospec[c2idx]
-    cf = np.poly1d(np.polyfit(wave[c2idx], r2, 3))
+    r1cont = mspec[c2idx] / ospec[c2idx]
+    cf1 = np.poly1d(np.polyfit(wave[c2idx], r1cont, 3))
     # Remove outliers
-    r2sig = r2.std()
-    c3idx = c2idx[np.where(np.abs(cf(wave[c2idx]) - r2) < 3*r2sig)[0]]
+    r1contsig = r1cont.std()
+    c3idx = c2idx[np.where(np.abs(cf1(wave[c2idx]) - r1cont) < 3*r1contsig)[0]]
 
     # Correction function tuned:
     # Repeat previous step with outliers removed
-    r3 = mspec[c3idx] / ospec[c3idx]
-    return np.poly1d(np.polyfit(wave[c3idx], r3, 3))
+    r2cont = mspec[c3idx] / ospec[c3idx]
+    return np.poly1d(np.polyfit(wave[c3idx], r2cont, 3)), c1idx, c2idx, c3idx
 
 
 def specsam(win, inspec, wnew):
