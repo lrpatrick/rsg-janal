@@ -17,11 +17,11 @@ import cc
 
 def chigrid(mgrid, ospec, owave, ores, idx, snr):
     """This function could take in oclass and mspec"""
-    chi = np.zeros(mgrid.shape[0:4])
+    chi = np.zeros(mgrid.shape[0:-1])
     mscale = np.zeros(mgrid.shape)
-    cft = np.zeros(np.append(mgrid.shape[0:4], 4))
+    cft = np.zeros(np.append(mgrid.shape[0:-1], 4))
 
-    for i, j, k, l in itertools.product(*map(xrange, (mgrid.shape[0:4]))):
+    for i, j, k, l in itertools.product(*map(xrange, (mgrid.shape[0:-1]))):
         # print(i, j, k, l)
         mspec = mgrid[i, j, k, l]
 

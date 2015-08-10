@@ -114,7 +114,8 @@ for i, j in enumerate(ospec):
     ospeccc[i] = spec
     # Using diag. lines only:
     idx = defidx(owave)
-    mgrid = readdata.cliptg(mdeg, mod.t.astype(float), mod.g, nom(n6822.L[i]))
+    mgrid = readdata.cliptg(mdeg, mod.t, mod.g, nom(n6822.L[i]))
+    # mgrid = mdeg
     owavem = owave
 
     print('[INFO] Compute chi-squared grid ...')
@@ -203,6 +204,23 @@ def plot2(r1, in1, out1, n1, r2, in2, out2, n2):
     ax[1].set_xlabel(n2 + ' In')
     ax[1].set_ylabel(n2 + ' Out')
 
+
+def chivspar(vchi, (mt, z, g, t), (mtr, zr, gr, tr)):
+    f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))
+    ax1.plot(mtr, vchi[:, z, g, t])
+    ax1.set_xlabel(r'$\xi$')
+    ax2.plot(zr, vchi[mt, :, g, t])
+    ax2.set_xlabel(r'[Z]')
+    ax3.plot(gr, vchi[mt, z, :, t])
+    ax3.set_xlabel(r'$log g$')
+    ax4.plot(tr, vchi[mt, z, g, :])
+    ax4.set_xlabel(r'$T_{eff}$')
+    plt.show()
+
+# zvst = [mod.t[bfclass[-1].vchi[6, z, 8, :].argmin()]
+#         for z in xrange(len(mod.z))]
+# zvsmt = [mod.mt[bfclass[-1].vchi[:, z, 8, 4].argmin()]
+#          for z in xrange(len(mod.z))]
 
 # Errors:
 # import errors

@@ -64,6 +64,8 @@ def degrade(wl, f, rin, rout):
         # Altered for a ND grid of spectra
         i = [slice(None)]*(len(f.shape) - 1) + [indx]
         # print i
+        # Could I use:
+        # ff[..., indx]?
         ff[i] = np.sum(f*kern, axis=len(f.shape) - 1)
         # ff[:, :, :, :, indx] = np.sum(f*kern, axis=len(f.shape) - 1)
     return ff

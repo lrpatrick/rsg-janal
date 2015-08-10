@@ -46,12 +46,12 @@ class BestFit(object):
         mtv, zv, gv, tv = np.meshgrid(self.prange[0], self.prange[1],
                                       self.prange[2], self.prange[3],
                                       indexing='ij')
-        n = 1000
-        bftop5 = self.bestfew(n)
+        n = 10
+        bftop = self.bestfew(n)
         mttop, ztop, gtop, \
             ttop, chival = np.array([(mtv[i], zv[i], gv[i], tv[i],
-                                     self.vchi[i]) for i in bftop5]).T
-        w = [np.exp(-i/2) for i in chival]
+                                     self.vchi[i]) for i in bftop]).T
+        w = [np.exp(-i) for i in chival]
         wi = w / np.sum(w)
         wpars = [np.average(i[0], weights=wi)
                  for i in zip((mttop, ztop, gtop, ttop))]

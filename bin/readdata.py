@@ -43,7 +43,7 @@ class ReadMod(object):
     def gridorder(self):
         """Sort the model grid and get something more well structured out!"""
         # Order:
-        teff = self.par.field('TEMPS')[0]  # 11
+        teff = self.par.field('TEMPS')[0].astype(float)  # 11
         abuns = self.par.field('ABUNS')[0]  # 19
         logg = self.par.field('GRAVS')[0]  # 9
         mt = self.par.field('TURBS')[0]  # 21
@@ -148,16 +148,19 @@ def cliptg(grid, trange, grange, l):
     gsi = 10**grange*10**-2
     t = lambda g, M: ((g*lsi) / (4*np.pi*sb*bigg*M))**0.25
     g = lambda T, M: np.log10(((4*np.pi*sb*bigg*M*T**4) / lsi)*10**2)
-    thigh = t(gsi, mlow)
-    tlow = t(gsi, mhigh)
+
+    tstep = trange[1] - trange[0]
+    thigh = t(gsi, mlow) + tstep
+    tlow = t(gsi, mhigh) - tstep
     for gi in xrange(len(grange)):
-        trej = np.where((tlow[gi] < trange) & (thigh[gi] < trange))
+        trej = np.where((tlow[gi] > trange) | (thigh[gi] < trange))[0]
         newgrid[:, :, gi, trej] = np.nan
 
-    ghigh = g(trange, mhigh)
-    glow = g(trange, mlow) - 0.3
+    gstep = grange[1] - grange[0]
+    ghigh = g(trange, mhigh) + gstep
+    glow = g(trange, mlow) - 0.3 - gstep
     for ti in xrange(len(trange)):
-        grej = np.where((glow[ti] < grange) & (ghigh[ti] < grange))
+        grej = np.where((glow[ti] > grange) | (ghigh[ti] < grange))[0]
         newgrid[:, :, grej, ti] = np.nan
 
     return newgrid

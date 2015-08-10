@@ -22,6 +22,7 @@ countour.py
 *.o
 *.so
 *.pyc
+*.sav
 
 # Packages #
 ############

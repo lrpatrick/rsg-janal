@@ -1,4 +1,4 @@
-# Date:2015-08-03
+# Date:2015-08-04
 # Author:LRP
 # Desctiption:
 # Fake input for Fake-spec-NGC6822.txt for rsganal.py
