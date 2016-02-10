@@ -5,6 +5,8 @@ lineonly/*
 models/*
 figs/*
 docs/*
+input/*
+output/*
 models/MODELSPEC_2013sep12_nLTE_R10000_J_turb_abun_grav_temp-int.sav
 N6822-RSG01mod-deg.txt
 N6822-RSG01mod.txt

@@ -1,4 +1,52 @@
 Author: LRP
-Date: 16-07-2015
+Date: 29-01-2016
 Description:
 An implemenation of the J-band Analysis technique
+
+File system should be set up with the following directories:
+
+bin
+docs
+input
+lib
+models
+output
+
+Non-standard python dependancies (without source code included here):
+
+uncertainties
+
+
+Notes:
+
+-- Currently, users must edit rsgjanal.py to include their input files.
+This is done on line 154 where odata is defined.
+
+-- The structure of the input files is important.
+Input file 1 includes the observed spectra in the format:
+0:wavelength-axis
+1-n: spec1, spec2, ..., specN
+
+Input file 2 contains information on the observations in the format:
+0: ID
+1-14: Photometry:B err V err R err I err J err H err K err
+15-16: res. err
+17: S/N
+
+(this should be updated to remove the optical photometry!)
+
+Work flow:
+
+Read in model grids (readdata.ReadMod)
+>
+Read in Observations(readdata.ReadObs)
+>
+Resample models & Degrade models (contfit.specsam & res.degrade)
+>
+Match spectra (rsgjanal.py using cc.crosc)
+>
+compute chisq grid (chisq.chigrid)
+>
+Estimate bestfit parameters (bestfit.BestFit)
+>
+Write outlines (rsgjanal.outfiles)

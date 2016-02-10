@@ -36,17 +36,17 @@ class ReadMod(object):
         self.head = self.changehead()
         self.res = float(10000.)
         self.mt, self.z, self.g, self.t = self.gridorder()
-        self.trim = maregion(self.wave, 1.165, 1.215)
+        self.trim = maregion(self.wave, 1.1575, 1.22)
         self.tgrid = self.grid[:, :, :, :, self.trim]
         self.twave = self.wave[self.trim]
 
     def gridorder(self):
         """Sort the model grid and get something more well structured out!"""
         # Order:
-        teff = self.par.field('TEMPS')[0].astype(float)  # 11
-        abuns = self.par.field('ABUNS')[0]  # 19
-        logg = self.par.field('GRAVS')[0]  # 9
-        mt = self.par.field('TURBS')[0]  # 21
+        teff = self.par.field('TEMPS')[0].astype(float)
+        abuns = self.par.field('ABUNS')[0]
+        logg = self.par.field('GRAVS')[0]
+        mt = self.par.field('TURBS')[0]
         # Return ordered similarlaly to the grid:
         return mt, abuns, logg, teff
 
@@ -95,7 +95,7 @@ class ReadObs(object):
         fspec: 1. Wavelength 2-N: Spectra
         fsinfo:
         0: ID
-        1-9: Photometry:B V R J err H err K err
+        1-9: Photometry:B V R I J err H err K err
         10-11: res. err
         12: S/N
 
@@ -110,60 +110,48 @@ class ReadObs(object):
 
         # Star info:
         self.info = np.genfromtxt(self.fsinfo)
-        self.id = self.info[:, 0]
-        self.phot = self.info[:, 1:10]
-        self.res = self.info[:, 10]
-        self.eres = self.info[:, 11]
-        self.sn = self.info[:, 12]
+        self.id = np.genfromtxt(self.fsinfo, usecols=0, dtype='S')
+        self.phot = self.info[:, 1:15]
+        self.res = self.info[:, 15]
+        self.eres = self.info[:, 16]
+        self.sn = self.info[:, 17]
 
-        self.wavenspec = np.genfromtxt(fspec)
+        self.wavenspec = np.genfromtxt(self.fspec)
         self.wave = self.wavenspec[:, 0]
         self.spec = self.wavenspec[:, 1:]
         self.nspec = self.spec / np.median(self.spec, axis=0)
 
-        self.mk = unumpy.uarray(self.phot[:, 7], self.phot[:, 8])
+        # self.mk = unumpy.uarray(self.phot[:, 10], self.phot[:, 11])
         self.L = self.luminosity()
         # self.gup, self.glow = self.glimits()
 
     def luminosity(self):
         """Calculate Luminosity based on Davies et al. (2013) correction"""
-        a = ufloat(0.90, 0.11)
-        b = ufloat(-0.40, 0.01)
-        l = a + b*(self.mk - self.mu)
+        print('[INFO] Please enter filter to compute bolometric correction')
+        band = raw_input('[INFO] Options [V, R, I, J, H, K]\n')
+        options = ['V', 'R', 'I', 'J', 'H', 'K']
+        while band not in options:
+            print('[INFO] You fool! {} is not a valid option!'.format(band))
+            print('[INFO] Please select a valid filter:')
+            band = raw_input('[INFO] Options [V, R, I, J, H, K]\n')
+
+        d = {'V': (ufloat(3.12, 0.06), ufloat(-0.29, 0.01), 2),
+             'R': (ufloat(2.44, 0.07), ufloat(-0.34, 0.01), 4),
+             'I': (ufloat(1.90, 0.08), ufloat(-0.37, 0.01), 6),
+             'J': (ufloat(1.30, 0.09), ufloat(-0.39, 0.01), 8),
+             'H': (ufloat(0.97, 0.10), ufloat(-0.40, 0.01), 10),
+             'K': (ufloat(0.90, 0.11), ufloat(-0.40, 0.01), 12)}
+        a, b, c = d[band]
+        # a = d[band][0]
+        # b = d[band][1]
+        # c = d[band][2]
+        self.band = unumpy.uarray(self.phot[:, c], self.phot[:, c + 1])
+        if band == 'K':
+            ak = 0.06  # For NGC2100
+            print('[INFO] IS Extinction taken as Ak=0.06 for NGC2100')
+            l = a + b*(self.band - self.mu - ak)
+        l = a + b*(self.band - self.mu)
         return l
-
-
-def cliptg(grid, trange, grange, l):
-    """
-        Clip the unphysical areas of the grid based on luminosity
-        Assumes a grid with axes: micro, Z, logg, Teff
-    """
-    newgrid = np.copy(grid)
-    mhigh = float(40*2*10**30)  # kg
-    mlow = float(8*2*10**30)  # kg
-    bigg = 6.67*10**-11  # m^2 s^-2 kg^-1
-    sb = 5.67*10**-8  # W m^-2 K^-4
-    lsun = float(3.846*10**26)
-    lsi = 10**l*lsun
-    gsi = 10**grange*10**-2
-    t = lambda g, M: ((g*lsi) / (4*np.pi*sb*bigg*M))**0.25
-    g = lambda T, M: np.log10(((4*np.pi*sb*bigg*M*T**4) / lsi)*10**2)
-
-    tstep = trange[1] - trange[0]
-    thigh = t(gsi, mlow) + tstep
-    tlow = t(gsi, mhigh) - tstep
-    for gi in xrange(len(grange)):
-        trej = np.where((tlow[gi] > trange) | (thigh[gi] < trange))[0]
-        newgrid[:, :, gi, trej] = np.nan
-
-    gstep = grange[1] - grange[0]
-    ghigh = g(trange, mhigh) + gstep
-    glow = g(trange, mlow) - 0.3 - gstep
-    for ti in xrange(len(trange)):
-        grej = np.where((glow[ti] > grange) | (ghigh[ti] < grange))[0]
-        newgrid[:, :, grej, ti] = np.nan
-
-    return newgrid
 
 
 def maregion(wave, w1, w2):

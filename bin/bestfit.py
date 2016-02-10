@@ -6,19 +6,22 @@ Find best fit parameters from a chisq-grid
 """
 from __future__ import print_function
 
+import astropy.constants as c
+import astropy.units as u
 import numpy as np
 
 
 class BestFit(object):
     """ Calculate bestfit parameters from a grid of chisq values"""
-    def __init__(self, fchi, mhead):
+    def __init__(self, fchi, mhead, name):
         self.fchi = fchi
         self.mhead = mhead
+        self.id = name
 
         self.pnames = self.mhead[1]
         self.prange = self.mhead[0]
 
-        # Remove 0.0's:
+        # Mask 0.0's:
         self.vchi = np.ma.masked_where(fchi == 0.0, fchi, copy=False)
         self.fi = np.unravel_index(np.argmin(self.vchi), self.vchi.shape)
         self.fipar = [self.prange[i][j] for i, j in enumerate(self.fi)]
@@ -30,6 +33,11 @@ class BestFit(object):
         print('[INFO] Parameters')
         print('[INFO] MicroTurb, [Z], log g, Teff:')
         print('[INFO]', self.fipar)
+
+    def showavpar(self):
+        print('[INFO] Weighted average parameters')
+        print('[INFO] MicroTurb, [Z], log g, Teff:')
+        print('[INFO]', np.around(self.wpar, 2))
 
     def bestfew(self, n):
         g1 = self.vchi
@@ -46,12 +54,12 @@ class BestFit(object):
         mtv, zv, gv, tv = np.meshgrid(self.prange[0], self.prange[1],
                                       self.prange[2], self.prange[3],
                                       indexing='ij')
-        n = 10
+        n = 100
         bftop = self.bestfew(n)
         mttop, ztop, gtop, \
             ttop, chival = np.array([(mtv[i], zv[i], gv[i], tv[i],
                                      self.vchi[i]) for i in bftop]).T
-        w = [np.exp(-i) for i in chival]
+        w = [np.exp(-i/2.) for i in chival]
         wi = w / np.sum(w)
         wpars = [np.average(i[0], weights=wi)
                  for i in zip((mttop, ztop, gtop, ttop))]
@@ -69,3 +77,41 @@ class BestFit(object):
         m = np.array(np.where(~dchi.mask))
         err = [np.std(self.prange[k][l]) for k, l in enumerate(m)]
         return err
+
+
+def clipg(grid, trange, grange, l):
+    """
+        Clip the unphysical areas of the grid based on luminosity.
+        Assumes a grid with axes: micro, Z, logg, Teff
+        Insert np.nan's into the grid where the range is clipped
+    """
+    newgrid = np.copy(grid)
+    # mhigh = 40.*c.M_sun
+    mhigh = 16.*c.M_sun  # As we know the age of 2100 quite well
+    mlow = 8.*c.M_sun
+    const = 4*np.pi*c.sigma_sb*c.G
+    lsi = 10**l*c.L_sun
+    g = lambda T, M: np.log10(((const*M*T**4) / lsi).cgs.value)
+
+    gstep = grange[1] - grange[0]
+    ghigh = g(trange*u.K, mhigh) + gstep
+    glow = g(trange*u.K, mlow) - 0.3 - gstep
+
+    print('[INFO] Rejected surface gravity models:')
+    for ti in xrange(len(trange)):
+        grej = np.where((glow[ti] > grange) | (ghigh[ti] < grange))[0]
+        newgrid[:, :, grej, ti] = np.nan
+        print(trange[ti], grange[grej])
+    return newgrid
+
+
+def clipmt(grid, mtrange):
+    """Restrict MicroTurb range."""
+    newgrid = np.copy(grid)
+    # mhigh = 40.*c.M_sun
+    newgrid[0:9, :, :] = np.nan
+    newgrid[12:, :, :] = np.nan
+    return newgrid
+
+# Estimated parameters: vo, sigma
+# Observed data: (rv, e_rv)
