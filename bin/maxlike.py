@@ -22,6 +22,8 @@ def find_nearest(array, value):
 def lnprior(theta):
     mt, z, g, t = theta
     # Start with no prior on logg for simplicity
+    # Even though it isn't stated here, there is a prior on logg as it gets
+    # clipped before it is passes to this function
     if 1. < mt < 5. and -1. < z < 1. and -1. < g < 1. and 3400 < t < 4400:
         return 0.0
     return -np.inf

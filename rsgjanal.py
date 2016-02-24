@@ -55,6 +55,11 @@ import corner
 # import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
+# Saving space on print statements
+o = str('[INFO] ')
+w = str('[WARNING] ')
+e = str('[ERROR] ')
+
 
 def trimspec(w1, w2, s2):
     """Trim s2 and w2 to match w1"""
@@ -68,12 +73,17 @@ def defidx(w1):
     This function is now twinned with chisq.chireg, any changes made here
     must be relected in chisq.chireg
     """
-    # # Main regions containing lines
-    # idx = [np.where((w1 > 1.18000) & (w1 < 1.19200))[0]]  # MgI, FeI, TiI
-    # idx.append(np.where((w1 > 1.19400) & (w1 < 1.20600))[0])  # TiI, FeI, SiIx3
-    # idx.append(np.where((w1 > 1.20600) & (w1 < 1.21200))[0])  # SiI, MgI
+    # Only the cores of individual lines (with main regions)
+    # idx = [np.where((w1 > 1.18205) & (w1 < 1.18330))[0]]  # MgI
+    # # idx = [np.where((w1 > 1.18780) & (w1 < 1.18880))[0]]  # FeI
+    # idx.append(np.where((w1 > 1.18780) & (w1 < 1.18990))[0])  # FeI & TiI
+    # idx.append(np.where((w1 > 1.19447) & (w1 < 1.19530))[0])  # TiI
+    # idx.append(np.where((w1 > 1.19650) & (w1 < 1.19965))[0])  # FeI, Si, Si
+    # idx.append(np.where((w1 > 1.20250) & (w1 < 1.20350))[0])  # SiI
+    # idx.append(np.where((w1 > 1.20780) & (w1 < 1.20870))[0])  # Mg
+    # idx.append(np.where((w1 > 1.21000) & (w1 < 1.21070))[0])  # SiI
 
-    # Only the cores of individual lines
+    # # Only the cores of individual lines
     idx = [np.where((w1 > 1.18205) & (w1 < 1.18330))[0]]  # MgI
     # idx = [np.where((w1 > 1.18780) & (w1 < 1.18880))[0]]  # FeI
     idx.append(np.where((w1 > 1.18780) & (w1 < 1.18880))[0])  # FeI
@@ -87,6 +97,12 @@ def defidx(w1):
     idx.append(np.where((w1 > 1.20780) & (w1 < 1.20870))[0])  # Mg
     # Plus some continuum:
     # idx.append(np.where((w1 > 1.2114) & (w1 < 1.21820))[0])  # continuum
+
+    # # Main regions containing lines
+    # idx = [np.where((w1 > 1.18000) & (w1 < 1.19200))[0]]  # MgI, FeI, TiI
+    # idx.append(np.where((w1 > 1.19400) & (w1 < 1.20600))[0])  # TiI, FeI, SiIx3
+    # idx.append(np.where((w1 > 1.20600) & (w1 < 1.21200))[0])  # SiI, MgI
+
     # Lines & continuum
     # idx = [np.where((w1 > 1.1879) & (w1 < 1.1899))[0]]
     # idx = [np.where((w1 > 1.18780) & (w1 < 1.18990))[0]]  # FeI & TiI
@@ -96,17 +112,6 @@ def defidx(w1):
     # idx.append(np.where((w1 > 1.19447) & (w1 < 1.19528))[0])  # TiI
     # idx.append(np.where((w1 > 1.1965) & (w1 < 1.19986))[0])  # FeI, SiI & SiI
     # idx.append(np.where((w1 > 1.20700) & (w1 < 1.21150))[0])  # Mg & Si
-
-    # Old:
-    # # idx = [np.where((w1 > 1.18150) & (w1 < 1.18360))[0]]  # Mg
-    # idx = [np.where((w1 > 1.1879) & (w1 < 1.1899))[0]]
-    # idx.append(np.where((w1 > 1.1879) & (w1 < 1.1899))[0])
-    # idx.append(np.where((w1 > 1.19447) & (w1 < 1.19528))[0])
-    # idx.append(np.where((w1 > 1.1965) & (w1 < 1.19986))[0])
-    # idx.append(np.where((w1 > 1.20253) & (w1 < 1.20359))[0])
-    # # idx.append(np.where((w1 > 1.20760) & (w1 < 1.21078))[0])  # Mg & Si
-    # # idx.append(np.where((w1 > 1.20760) & (w1 < 1.20900))[0])  # Mg only
-    # idx.append(np.where((w1 > 1.20986) & (w1 < 1.21078))[0])  # Si only
     return idx
 
 
@@ -150,12 +155,16 @@ def outfiles():
         head = ('Author: LRP\nDate: ' + date + desc)
         tmp = np.column_stack((owave, ospeccc[i], j))
         fname = 'output/' + odata.id[i]
-        np.savetxt(fname, tmp, header=head, fmt='%6.6f')
-        print('[INFO] Spectra written to file: {}'.format(fname))
+        np.savetxt(fname + '.dat', tmp, header=head, fmt='%6.6f')
+        print(o + 'Spectra written to file: {}.dat'.format(fname))
 
     # Save final parameters to text file:
     pname = 'output/' + raw_input('[INFO] Please enter an appropriate \
-    filename in the format xxx-pars.dat\n')
+    filename in the format xxx-pars.dat\n') + '-pars'
+    while pname == 'output/-pars':
+        print(o + 'Please include an appropriate file name:')
+        pname = 'output/' + raw_input('[INFO] Please enter an appropriate \
+    filename in the format xxx-pars.dat\n') + '-pars'
     desc = '\nDescription\nBestfit parameters for input spectra\n\
     ID, micro, [Z], logg, Teff, err_micro, err_Z, err_logg, err_teff'
     head = ('Author: LRP\nDate: ' + date + desc)
@@ -164,8 +173,8 @@ def outfiles():
                                    pars_mcmc.shape[1]*pars_mcmc.shape[2])
     opars_mcmc = np.column_stack((odata.id, np.round(pars_mcmc_, 5)))
     np.savetxt(pname + '.dat', opars, header=head, fmt='%s')
-    np.savetxt(pname + 'mcmc.dat', opars_mcmc, header=head, fmt='%s')
-    print('[INFO] Please note that this file needs a more descriptive header')
+    np.savetxt(pname + '-mcmc.dat', opars_mcmc, header=head, fmt='%s')
+    print(o + 'Please note that this file needs a more descriptive header')
     return
 
 # MCMC stuff:
@@ -190,8 +199,8 @@ def lnlike(theta, spec, sn):
     parameters = (mod.mt, mod.z, mod.g, mod.t)
     chidx = [find_nearest(i, j) for i, j in zip(parameters, theta)]
     # Index the chisq grid
-    chi = bfobj.vchi
-    like = -chi[chidx[0], chidx[1], chidx[2], chidx[3]]
+    chi = bfobj.vchi   # / len(line_idx)
+    like = -(chi[chidx[0], chidx[1], chidx[2], chidx[3]])/2.
 
     # Compute the chisq myself:
     # model = mgrid[chidx[0], chidx[1], chidx[2], chidx[3]]
@@ -243,13 +252,16 @@ def run_mcmc(spec, sn, ndim, nwalkers, burnin, nsteps, nout):
                                     args=(spec, 1./sn), threads=1)
 
     # Clear and run the production chain.
-    print("Running MCMC...")
-
+    print(o + 'Running MCMC...')
+    then = time.time()
     state = None
     while sampler.iterations < nsteps:
         pos, lnp, state = sampler.run_mcmc(pos, nout, rstate0=state)
 
-    print("Mean acceptance fraction:", np.mean(sampler.acceptance_fraction))
+    print(o + 'Time taken: {}s'.format(round(time.time() - then, 3)))
+    print(o + 'Mean acceptance fraction:', np.mean(sampler.acceptance_fraction))
+    print(o + 'Autocorrelation time for each parameters:', sampler.acor)
+    print(o + 'If autocorrelation time < run time increase samples')
     return sampler, pos, lnp
 
 
@@ -288,6 +300,7 @@ def make_plots(sampler, ndim, burnin, pos, lnp):
     print(np.round(t_mcmc, 3))
     return mt_mcmc, z_mcmc, g_mcmc, t_mcmc
 
+
 def run_fit(spec, sn):
     # ndim     = number of parameters
     # nwalkers = number of walkers
@@ -295,8 +308,8 @@ def run_fit(spec, sn):
     # nsteps   = total number of steps
     # nout     = output every nout
 
-    ndim, nwalkers, burnin, nsteps, nout = 4, 100, 100, 400, 100
-    print('ndim, nwalkers, burnin, nsteps, nout =',
+    ndim, nwalkers, burnin, nsteps, nout = 4, 200, 100, 2000, 10
+    print(o + 'ndim, nwalkers, burnin, nsteps, nout =',
           ndim, nwalkers, burnin, nsteps, nout)
 
     sampler, pos, lnp = run_mcmc(spec, sn, ndim, nwalkers,
@@ -313,7 +326,6 @@ then = time.time()
 mod = readdata.ReadMod(
     'models/MODELSPEC_251114_J_nlte_R10000_J_turb_abun_grav_temp-int.sav')
 
-
 print('[INFO] Time taken: {}s'.format(round(time.time() - then, 3)))
 
 print('[INFO] Read observed spectra from file:')
@@ -324,13 +336,13 @@ print('[INFO] Please ensure all files are ordered similarly!')
 # odata = readdata.ReadObs('../ngc6822/Spectra/N6822-spec-24AT-sam-norm.txt',
 #                          'input/NGC6822-janal-input.txt',
 #                          mu=ufloat(23.3, 0.05))
-# odata = readdata.ReadObs('input/NGC6822-janal-nspec.v1.txt',
-#                          'input/NGC6822-janal-input.txt',
-#                          mu=ufloat(23.3, 0.05))
+odata = readdata.ReadObs('input/NGC6822-janal-nspec.v1.txt',
+                         'input/NGC6822-janal-input.txt',
+                         mu=ufloat(23.3, 0.05))
 
 # n6822 = readdata.ReadObs('input/NGC300-janal-nspec-lum.v2.txt',
 #                          'input/NGC300-janal-info.txt',
-#                          mu=ufloat(26.5, 0.05))
+#                          mu=ufloat(23.5, 0.05))
 
 # odata = readdata.ReadObs('input/NGC2100-janal-nspec.v3.txt',
 #                          'input/NGC2100-janal-info.txt',
@@ -340,12 +352,17 @@ print('[INFO] Please ensure all files are ordered similarly!')
 #                          'input/NGC2100-janal-info-bad1.txt',
 #                          mu=ufloat(18.5, 0.05))
 # Cluster spectrum:
-odata = readdata.ReadObs('input/NGC2100-nspec-cspec.v1.txt',
-                         'input/NGC2100-janal-info-cluster.txt',
-                         mu=ufloat(18.5, 0.05))
+# odata = readdata.ReadObs('input/NGC2100-nspec-cspec.v1.txt',
+#                          'input/NGC2100-janal-info-cluster.txt',
+#                          mu=ufloat(18.5, 0.05))
 
-# odata = readdata.ReadObs('input/Fake-spec-NGC6822-nmt1sn150.txt',
-#                          'input/Fake-info-NGC6822-nmt1sn150.txt',
+# Fake Input:
+# odata = readdata.ReadObs('input/Fake-spec-Fakespec-tsnr.txt',
+#                          'input/Fake-info-Fakespec-tsnr.txt',
+#                          mu=ufloat(23.3, 0.05))
+
+# odata = readdata.ReadObs('input/Fake-spec-Fakespec-tres-sn500.txt',
+#                          'input/Fake-info-Fakespec-tres-sn500.txt',
 #                          mu=ufloat(23.3, 0.05))
 # odata = readdata.ReadObs('input/Fake-spec-NGC6822-t1sn150.txt',
 #                          'input/Fake-info-NGC6822-t1sn150.txt',
@@ -387,7 +404,7 @@ for i, j in enumerate(ospec):
     s1, arr_ = cc.crossc(mspec1, j, width=40)
     print('[INFO] Cross-Correlation shift = {}'.format(s1))
     # tmp_spec, s1 = cc.ccshift(mspec1, j, owave, quiet=False, width=40)
-    s = odata.spec[:, i]
+    s = odata.spec[:, i]  # Why is 'j' not used here?
     srest, s2 = cc.ccshift(mspec1, s, odata.wave, shift1=s1, quiet=False)
     owave1, spec = trimspec(mod.twave, odata.wave, srest)
     # spec, s1 = cc.ccshift(mspec1, j, owave, quiet=False, width=40)
@@ -427,7 +444,7 @@ pars = pars.reshape(len(pars), 8)
 pars_mcmc = np.array(pars_mcmc)
 
 # End game
-# outfiles()
+outfiles()
 
 # Unfinished and/or unused:
 

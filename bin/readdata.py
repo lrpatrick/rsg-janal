@@ -21,12 +21,13 @@ stddev = unumpy.std_devs
 
 class ReadMod(object):
     """
-        Simple class to read in model grid and alter the shape of it
+    Simple class to read in model grid and alter the shape of it
 
-        ... find out who desinged this grid! -- and destroy them?
-        How could someone make the names and the grid a different order!!!
+    ... find out who desinged this grid! -- and destroy them?
+    How could someone make the names and the grid a different order!!!
 
     """
+
     def __init__(self, savfile):
         self.all = readsav(savfile)
         self.grid = self.all['modelspec'][0][0]
@@ -148,7 +149,7 @@ class ReadObs(object):
         self.band = unumpy.uarray(self.phot[:, c], self.phot[:, c + 1])
         if band == 'K':
             ak = 0.06  # For NGC2100
-            print('[INFO] IS Extinction taken as Ak=0.06 for NGC2100')
+            print('[INFO] IS Extinction taken as Ak=0.06 for E(B-V)=0.17')
             l = a + b*(self.band - self.mu - ak)
         l = a + b*(self.band - self.mu)
         return l

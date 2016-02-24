@@ -33,10 +33,11 @@ def chigrid(mgrid, ospec, owave, ores, idx, snr):
 
 
 def chiprep(ospec, owave, ores, mspec, idx, snr):
-    """Prep for chisq calculation
-        This function could take in a oclass and mspec
-        This function is now twinned with rsganal.defidx, any changes made here
-        must be relected in chisq.chireg
+    """
+    Prep for chisq calculation
+    This function could take in a oclass and mspec
+    This function is now twinned with rsganal.defidx, any changes made here
+    must be relected in chisq.chireg
     """
     cft = contfit.contfit(ores, owave, mspec, ospec)[0]
     mscale = mspec / cft(owave)
@@ -83,7 +84,7 @@ def chireg(w1):
     # ccreg.append(np.where((w1 > 1.20600) & (w1 < 1.21200))[0])  # SiI, MgI
     # ccreg.append(np.where((w1 > 1.20600) & (w1 < 1.21200))[0])  # SiI, MgI
 
-    # For "Only the cores of individual lines" in rsganal.defidx
+    # # For "Only the cores of individual lines" in rsganal.defidx
     # ccreg = [np.where((w1 > 1.1870) & (w1 < 1.190))[0]]  # FeI & TiI
     ccreg = [np.where((w1 > 1.1815) & (w1 < 1.1850))[0]]  # MgI
     ccreg.append(np.where((w1 > 1.1870) & (w1 < 1.190))[0])  # FeI & TiI
@@ -95,6 +96,17 @@ def chireg(w1):
     ccreg.append(np.where((w1 > 1.20100) & (w1 < 1.20500))[0])  # SiI
     ccreg.append(np.where((w1 > 1.20700) & (w1 < 1.21150))[0])  # Mg & Si
     ccreg.append(np.where((w1 > 1.20700) & (w1 < 1.21150))[0])  # Mg & Si
+    # ccreg.append(np.where((w1 > 1.2114) & (w1 < 1.21820))[0])  # continuum
+
+    # For "Only the cores of individual lines" in rsganal.defidx
+    # ccreg = [np.where((w1 > 1.1870) & (w1 < 1.190))[0]]  # FeI & TiI
+    # ccreg = [np.where((w1 > 1.1815) & (w1 < 1.1850))[0]]  # MgI
+    # ccreg.append(np.where((w1 > 1.1870) & (w1 < 1.190))[0])  # FeI & TiI
+    # ccreg.append(np.where((w1 > 1.19350) & (w1 < 1.19600))[0])  # TiI,FeI,SiIx2
+    # ccreg.append(np.where((w1 > 1.19550) & (w1 < 1.19800))[0])  # TiI,FeI,SiIx2
+    # ccreg.append(np.where((w1 > 1.20100) & (w1 < 1.20500))[0])  # SiI
+    # ccreg.append(np.where((w1 > 1.20700) & (w1 < 1.21150))[0])  # Mg & Si
+    # ccreg.append(np.where((w1 > 1.20700) & (w1 < 1.21150))[0])  # Mg & Si
     return ccreg
 
 

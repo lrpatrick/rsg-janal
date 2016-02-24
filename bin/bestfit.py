@@ -10,10 +10,17 @@ import astropy.constants as c
 import astropy.units as u
 import numpy as np
 
+# Saving space on print statements
+o = str('[INFO] ')
+w = str('[WARNING] ')
+e = str('[ERROR] ')
+
 
 class BestFit(object):
-    """ Calculate bestfit parameters from a grid of chisq values"""
+    """Calculate bestfit parameters from a grid of chisq values"""
+
     def __init__(self, fchi, mhead, name):
+        """Init"""
         self.fchi = fchi
         self.mhead = mhead
         self.id = name
@@ -29,17 +36,20 @@ class BestFit(object):
         self.err = self.errparam()
 
     def showmin(self):
+        """Print minimum of chisq-grid and the parameters"""
         print('[INFO] Minimum of chisq-grid:', self.vchi.min())
         print('[INFO] Parameters')
         print('[INFO] MicroTurb, [Z], log g, Teff:')
         print('[INFO]', self.fipar)
 
     def showavpar(self):
+        """Print weigthed average parameters"""
         print('[INFO] Weighted average parameters')
         print('[INFO] MicroTurb, [Z], log g, Teff:')
         print('[INFO]', np.around(self.wpar, 2))
 
     def bestfew(self, n):
+        """Select top n bestfit models"""
         g1 = self.vchi
         bfall = []
         for i in xrange(n):
@@ -79,15 +89,40 @@ class BestFit(object):
         return err
 
 
+def masslims():
+    print('[INFO] Mass restrictions for this data set?')
+    while True:
+        try:
+            mhigh = int(raw_input('[INFO] Upper limit: Default 40 M_sun:\n') or
+                        int(40))
+            break
+        except ValueError:
+            print('[ERROR] Fool! Input not int. Try again...')
+            print('[INFO] Please select an integer between 8 and 40')
+
+    while True:
+        try:
+            mlow = int(raw_input('[INFO] Lower limit: Default 8 M_sun:\n') or
+                       int(8))
+            break
+        except ValueError:
+            print('[ERROR] Fool! Input not int. Try again...')
+            print('[INFO] Please select an integer between 8 and 40')
+    return mhigh*c.M_sun, mlow*c.M_sun
+
+
 def clipg(grid, trange, grange, l):
     """
-        Clip the unphysical areas of the grid based on luminosity.
-        Assumes a grid with axes: micro, Z, logg, Teff
-        Insert np.nan's into the grid where the range is clipped
+    Clip the unphysical areas of the grid based on luminosity.
+    Assumes a grid with axes: micro, Z, logg, Teff
+    Insert np.nan's into the grid where the range is clipped
     """
     newgrid = np.copy(grid)
     # mhigh = 40.*c.M_sun
-    mhigh = 16.*c.M_sun  # As we know the age of 2100 quite well
+    mhigh, mlow = masslims()
+
+    # else    40.*c.M_sun
+    # mhigh = 16.*c.M_sun  # As we know the age of 2100 quite well
     mlow = 8.*c.M_sun
     const = 4*np.pi*c.sigma_sb*c.G
     lsi = 10**l*c.L_sun
@@ -101,7 +136,7 @@ def clipg(grid, trange, grange, l):
     for ti in xrange(len(trange)):
         grej = np.where((glow[ti] > grange) | (ghigh[ti] < grange))[0]
         newgrid[:, :, grej, ti] = np.nan
-        print(trange[ti], grange[grej])
+        print(r'[INFO] Teff {}K log g {}'.format(trange[ti], grange[grej]))
     return newgrid
 
 
