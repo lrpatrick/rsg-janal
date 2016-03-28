@@ -37,6 +37,7 @@ sys.path.append("/home/lee/Work/RSG-JAnal/bin/.")
 import matplotlib.pyplot as plt
 import numpy as np
 import time
+
 from uncertainties import ufloat
 from uncertainties import unumpy
 
@@ -53,6 +54,7 @@ nom = unumpy.nominal_values
 import emcee
 import corner
 # import matplotlib.pyplot as plt
+from scipy.interpolate import interpn
 from matplotlib.ticker import MaxNLocator
 
 # Saving space on print statements
@@ -189,20 +191,29 @@ def lnprior(theta):
     mt, z, g, t = theta
     # These priors are a fantasy as I already implement priors for the chisq
     # calculation
-    if 1. < mt < 5. and -1. < z < 1. and -1. < g < 1. and 3400 < t < 4400:
+    if 1. < mt < 5. and -1. < z < 0. and -1. < g < 1. and 3400 < t < 4400:
         return 0.0
     return -np.inf
 
 
 def lnlike(theta, spec, sn):
     mt, z, g, t = theta
-    parameters = (mod.mt, mod.z, mod.g, mod.t)
-    chidx = [find_nearest(i, j) for i, j in zip(parameters, theta)]
+    points = (mod.mt, mod.z, mod.g, mod.t)
     # Index the chisq grid
-    chi = bfobj.vchi   # / len(line_idx)
-    like = -(chi[chidx[0], chidx[1], chidx[2], chidx[3]])/2.
+    chi = bfobj.vchi
 
-    # Compute the chisq myself:
+    # Nearest neighbour
+    chidx = [find_nearest(i, j) for i, j in zip(points, theta)]
+    like_check = -(chi[chidx[0], chidx[1], chidx[2], chidx[3]])/2.
+    # Interpolate the grid
+    if like_check is np.ma.masked:
+        like = -np.inf
+    else:
+        like = -(interpn(points, chi, theta, fill_value=-np.inf))/2.
+
+    # like = -(interpn(points, chi, theta, fill_value=-np.inf))/2.
+    # print(like)
+    # Compute the chisq in house:
     # model = mgrid[chidx[0], chidx[1], chidx[2], chidx[3]]
     # if not np.isfinite(model):
     #     return -np.inf
@@ -217,7 +228,7 @@ def lnlike(theta, spec, sn):
     # return np.sum(np.log(like))
     # return np.sum(lnlike)
     # return like
-    if not np.isfinite(like):
+    if not np.isfinite(like) or np.abs(like) == 0.0:
         return -np.inf
     return np.sum(like)
 
@@ -227,7 +238,7 @@ def lnprob(theta, spec, sn):
     if not np.isfinite(lp):
         return -np.inf
     # Prior + likelihood function
-    return lp + lnlike(theta, spec, 1./sn)
+    return lp + lnlike(theta, spec, sn)
 
 
 def run_mcmc(spec, sn, ndim, nwalkers, burnin, nsteps, nout):
@@ -235,12 +246,13 @@ def run_mcmc(spec, sn, ndim, nwalkers, burnin, nsteps, nout):
     np.random.seed(123)
 
     # Set up the sampler.
-    # average micro, Z=LMC, logg=0.0, Teff=4000
-    guess = [3.5, -0.3, 0.2, 4000]
+    # average micro, Z=LMC, logg=-0.1, Teff=4000
+    # Z and logg cannot be set ==0.0 as pos will also be zero, always
+    guess = [3.5, -0.3, -0.1, 3900]
 
-    # How much should the initial positions alter??
     # Initial positions of the walkers in parameter space
-    pos = np.array([guess + 0.01*np.array(guess)*np.random.randn(ndim)
+    # Make sure this guess is somewhere physical!
+    pos = np.array([guess + 0.001*np.array(guess)*np.random.randn(ndim)
                     for i in range(nwalkers)])
 
     # lnprob - A function that takes a vector in the parameter space as input
@@ -249,7 +261,7 @@ def run_mcmc(spec, sn, ndim, nwalkers, burnin, nsteps, nout):
     # args - (optional) A list of extra positional arguments for lnprob.
     # lnprob will be called with the sequence lnprob(p, *args, **kwargs).
     sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob,
-                                    args=(spec, 1./sn), threads=1)
+                                    args=(spec, sn), threads=1)
 
     # Clear and run the production chain.
     print(o + 'Running MCMC...')
@@ -259,7 +271,7 @@ def run_mcmc(spec, sn, ndim, nwalkers, burnin, nsteps, nout):
         pos, lnp, state = sampler.run_mcmc(pos, nout, rstate0=state)
 
     print(o + 'Time taken: {}s'.format(round(time.time() - then, 3)))
-    print(o + 'Mean acceptance fraction:', np.mean(sampler.acceptance_fraction))
+    print(o + 'Mean acceptance frac:', np.mean(sampler.acceptance_fraction))
     print(o + 'Autocorrelation time for each parameters:', sampler.acor)
     print(o + 'If autocorrelation time < run time increase samples')
     return sampler, pos, lnp
@@ -268,26 +280,21 @@ def run_mcmc(spec, sn, ndim, nwalkers, burnin, nsteps, nout):
 def make_plots(sampler, ndim, burnin, pos, lnp):
     # pl.clf()
 
-    # fig, axes = plt.subplots(ndim, 1, sharex=True, figsize=(8, 8))
-    # label = ['xi (km/s)', '[Z]', 'log g', 'T_{eff}']
+    fig, axes = plt.subplots(ndim, 1, sharex=True, figsize=(8, 8))
+    label = [r'$\xi$ (km/s)', '[Z] (dex)',
+             'log g (c.g.s)', r'T$_{\rm eff}$ (K)']
 
-    # for i in range(ndim):
-    #     axes[i].plot(sampler.chain[:, :, i].T, color="k", alpha=0.4)
-    #     axes[i].yaxis.set_major_locator(MaxNLocator(5))
-    #     axes[i].set_ylabel(label[i])
+    for i in range(ndim):
+        axes[i].plot(sampler.chain[:, :, i].T, color="k", alpha=0.4)
+        axes[i].yaxis.set_major_locator(MaxNLocator(5))
+        axes[i].set_ylabel(label[i])
 
-    # fig.tight_layout(h_pad=0.0)
+    fig.tight_layout(h_pad=0.0)
     # out1 = 'NGC2100_line-time.png'
     # fig.savefig(out1)
 
     # Make the triangle plot.
     samples = sampler.chain[:, burnin:, :].reshape((-1, ndim))
-    # fig = corner.corner(samples, labels=['xi (km/s)', '[Z]', 'log g', 'T_{eff}'],
-    #                     truths=['NaN', 'NaN', 'NaN', 'NaN'],
-    #                     figsize=(8, 8))
-    # out2 = 'NGC2100_line-triangle-v2.png'
-    # fig.savefig(out2)
-
     # Compute the quantiles.
     mt_mcmc, z_mcmc, \
         g_mcmc, t_mcmc = map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
@@ -298,6 +305,12 @@ def make_plots(sampler, ndim, burnin, pos, lnp):
     print(np.round(z_mcmc, 3))
     print(np.round(g_mcmc, 3))
     print(np.round(t_mcmc, 3))
+    fig = corner.corner(samples, labels=label,
+                        truths=['NaN', 'NaN', 'NaN', 'NaN'],
+                        figsize=(8, 8))
+    # out2 = 'NGC2100_line-triangle-v2.png'
+    # fig.savefig(out2)
+
     return mt_mcmc, z_mcmc, g_mcmc, t_mcmc
 
 
@@ -308,7 +321,7 @@ def run_fit(spec, sn):
     # nsteps   = total number of steps
     # nout     = output every nout
 
-    ndim, nwalkers, burnin, nsteps, nout = 4, 200, 100, 2000, 10
+    ndim, nwalkers, burnin, nsteps, nout = 4, 300, 500, 1000, 10
     print(o + 'ndim, nwalkers, burnin, nsteps, nout =',
           ndim, nwalkers, burnin, nsteps, nout)
 
@@ -336,9 +349,9 @@ print('[INFO] Please ensure all files are ordered similarly!')
 # odata = readdata.ReadObs('../ngc6822/Spectra/N6822-spec-24AT-sam-norm.txt',
 #                          'input/NGC6822-janal-input.txt',
 #                          mu=ufloat(23.3, 0.05))
-odata = readdata.ReadObs('input/NGC6822-janal-nspec.v1.txt',
-                         'input/NGC6822-janal-input.txt',
-                         mu=ufloat(23.3, 0.05))
+# odata = readdata.ReadObs('input/NGC6822-janal-nspec.v1.txt',
+#                          'input/NGC6822-janal-input.txt',
+#                          mu=ufloat(23.3, 0.05))
 
 # n6822 = readdata.ReadObs('input/NGC300-janal-nspec-lum.v2.txt',
 #                          'input/NGC300-janal-info.txt',
@@ -351,18 +364,30 @@ odata = readdata.ReadObs('input/NGC6822-janal-nspec.v1.txt',
 # odata = readdata.ReadObs('input/NGC2100-bad1-nspec.txt',
 #                          'input/NGC2100-janal-info-bad1.txt',
 #                          mu=ufloat(18.5, 0.05))
+
+# odata = readdata.ReadObs('input/NGC55-nspec-galspec-v1.txt',
+#                          'input/NGC55-janal-info-gal.txt',
+#                          mu=ufloat(26.58, 0.11))  # Tanka et al. 2011
+
+# odata = readdata.ReadObs('input/ngc55-35-r5.txt',
+#                          'input/NGC55-janal-info-ngc35.txt',
+#                          mu=ufloat(26.7, 0.11))  # Rolf's email
+odata = readdata.ReadObs('input/NGC55-nspec-sample-v5.txt',
+                         'input/NGC55-janal-info-sample.txt',
+                         mu=ufloat(26.7, 0.11))  # Rolf's email
+
 # Cluster spectrum:
-# odata = readdata.ReadObs('input/NGC2100-nspec-cspec.v1.txt',
+# odata = readdata.ReadObs('input/NGC2100-nspec-cspec.v4.txt',
 #                          'input/NGC2100-janal-info-cluster.txt',
 #                          mu=ufloat(18.5, 0.05))
 
 # Fake Input:
-# odata = readdata.ReadObs('input/Fake-spec-Fakespec-tsnr.txt',
-#                          'input/Fake-info-Fakespec-tsnr.txt',
+# odata = readdata.ReadObs('input/Fake-spec-Fakespec-t1.txt',
+#                          'input/Fake-info-Fakespec-t1.txt',
 #                          mu=ufloat(23.3, 0.05))
 
-# odata = readdata.ReadObs('input/Fake-spec-Fakespec-tres-sn500.txt',
-#                          'input/Fake-info-Fakespec-tres-sn500.txt',
+# odata = readdata.ReadObs('input/Fake-spec-Fakespec-tres-sn150-all.txt',
+#                          'input/Fake-info-Fakespec-tres-sn150-all.txt',
 #                          mu=ufloat(23.3, 0.05))
 # odata = readdata.ReadObs('input/Fake-spec-NGC6822-t1sn150.txt',
 #                          'input/Fake-info-NGC6822-t1sn150.txt',

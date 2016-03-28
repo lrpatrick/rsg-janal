@@ -119,11 +119,8 @@ def clipg(grid, trange, grange, l):
     """
     newgrid = np.copy(grid)
     # mhigh = 40.*c.M_sun
+    # mlow = 8.*c.M_sun
     mhigh, mlow = masslims()
-
-    # else    40.*c.M_sun
-    # mhigh = 16.*c.M_sun  # As we know the age of 2100 quite well
-    mlow = 8.*c.M_sun
     const = 4*np.pi*c.sigma_sb*c.G
     lsi = 10**l*c.L_sun
     g = lambda T, M: np.log10(((const*M*T**4) / lsi).cgs.value)
