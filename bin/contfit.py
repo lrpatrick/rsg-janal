@@ -9,24 +9,39 @@ from __future__ import print_function
 
 import numpy as np
 from scipy.interpolate import interp1d
+from scipy.signal import medfilt
+
+
+def alt_contfit(res, wave, mspec, ospec):
+    """
+    Default method only really works for good S/N data
+    For poorer S/N data we'll do something a little more simple
+
+    1. Divide observed spectrum by model spec
+        (assuming wavelength solution is consistent)
+    2. Median filter the result (filter width = 7 i.e. extreme!)
+    3. Fit third order polynomial to the reusult
+    """
+    residual = ospec / mspec
+    mf7 = medfilt(residual, 7)
+    return np.poly1d(np.polyfit(wave, mf7, 3)), 0, 0, 0
 
 
 def contfit(res, wave, mspec, ospec):
     """
+    Arguments:
+    res : float
+        Resolution of the observations and model
+    wave : numpy.ndarray
+        Wavelength axis for model and observations
+    mspec : numpy.ndarray
+        Model spectrum (same size as wave & ospec)
+    ospec : numpy.ndarray
+        Observed spectrum
 
-        Arguments:
-        res : float
-            Resolution of the observations and model
-        wave : numpy.ndarray
-            Wavelength axis for model and observations
-        mspec : numpy.ndarray
-            Model spectrum (same size as wave & ospec)
-        ospec : numpy.ndarray
-            Observed spectrum
-
-        Returns:
-        cft : numpy.lib.polynomial.poly1d
-            Function which defines the scaling for the model/obs. spectra
+    Returns:
+    cft : numpy.lib.polynomial.poly1d
+        Function which defines the scaling for the model/obs. spectra
     """
     # Checks
     if res > 10000.:
@@ -61,20 +76,15 @@ def contfit(res, wave, mspec, ospec):
 
 
 def specsam(win, inspec, wnew):
-    """
-        Change sampling of the model to match the observations by means of a
-        linear interpolation using scipy.interpolate.interp1d
-
-        Arguments:
-        win : numpy.ndarray
-            Initial wavelength axis
-        inspec : numpy.ndarray
-            Input spectrum associated with win
-        wnew : numpy.ndarray
-
-        Output:
-        newspec : numpy.ndarray
-            inspec resampled onto wnew
-    """
+    """Update spectral sampling using scipy.interpolate.interp1d"""
     i1d = interp1d(win, inspec)
     return i1d(wnew)
+
+
+def wiggles(wave, s):
+    """
+    Remove any large scale wiggles from the spectrum using a simple 3rd order
+    polynomial function
+    """
+    wf = np.poly1d(np.polyfit(wave, s, 3))
+    return s / wf(wave)

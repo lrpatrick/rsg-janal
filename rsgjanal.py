@@ -95,7 +95,7 @@ def defidx(w1):
     idx.append(np.where((w1 > 1.19780) & (w1 < 1.19878))[0])  # SiI
     idx.append(np.where((w1 > 1.19878) & (w1 < 1.19965))[0])  # SiI
     idx.append(np.where((w1 > 1.20250) & (w1 < 1.20350))[0])  # SiI
-    idx.append(np.where((w1 > 1.21000) & (w1 < 1.21070))[0])  # SiI
+    # idx.append(np.where((w1 > 1.21000) & (w1 < 1.21070))[0])  # SiI
     idx.append(np.where((w1 > 1.20780) & (w1 < 1.20870))[0])  # Mg
     # Plus some continuum:
     # idx.append(np.where((w1 > 1.2114) & (w1 < 1.21820))[0])  # continuum
@@ -189,7 +189,7 @@ def find_nearest(array, value):
 
 def lnprior(theta):
     mt, z, g, t = theta
-    # These priors are a fantasy as I already implement priors for the chisq
+    # Priors are also implemented by the logg clipping for the chisq
     # calculation
     if 1. < mt < 5. and -1. < z < 0. and -1. < g < 1. and 3400 < t < 4400:
         return 0.0
@@ -280,16 +280,16 @@ def run_mcmc(spec, sn, ndim, nwalkers, burnin, nsteps, nout):
 def make_plots(sampler, ndim, burnin, pos, lnp):
     # pl.clf()
 
-    fig, axes = plt.subplots(ndim, 1, sharex=True, figsize=(8, 8))
-    label = [r'$\xi$ (km/s)', '[Z] (dex)',
-             'log g (c.g.s)', r'T$_{\rm eff}$ (K)']
+    # fig, axes = plt.subplots(ndim, 1, sharex=True, figsize=(8, 8))
+    # label = [r'$\xi$ (km/s)', '[Z] (dex)',
+    #          'log g (c.g.s)', r'T$_{\rm eff}$ (K)']
 
-    for i in range(ndim):
-        axes[i].plot(sampler.chain[:, :, i].T, color="k", alpha=0.4)
-        axes[i].yaxis.set_major_locator(MaxNLocator(5))
-        axes[i].set_ylabel(label[i])
+    # for i in range(ndim):
+    #     axes[i].plot(sampler.chain[:, :, i].T, color="k", alpha=0.4)
+    #     axes[i].yaxis.set_major_locator(MaxNLocator(5))
+    #     axes[i].set_ylabel(label[i])
 
-    fig.tight_layout(h_pad=0.0)
+    # fig.tight_layout(h_pad=0.0)
     # out1 = 'NGC2100_line-time.png'
     # fig.savefig(out1)
 
@@ -305,9 +305,9 @@ def make_plots(sampler, ndim, burnin, pos, lnp):
     print(np.round(z_mcmc, 3))
     print(np.round(g_mcmc, 3))
     print(np.round(t_mcmc, 3))
-    fig = corner.corner(samples, labels=label,
-                        truths=['NaN', 'NaN', 'NaN', 'NaN'],
-                        figsize=(8, 8))
+    # fig = corner.corner(samples, labels=label,
+    #                     truths=['NaN', 'NaN', 'NaN', 'NaN'],
+    #                     figsize=(8, 8))
     # out2 = 'NGC2100_line-triangle-v2.png'
     # fig.savefig(out2)
 
@@ -372,9 +372,13 @@ print('[INFO] Please ensure all files are ordered similarly!')
 # odata = readdata.ReadObs('input/ngc55-35-r5.txt',
 #                          'input/NGC55-janal-info-ngc35.txt',
 #                          mu=ufloat(26.7, 0.11))  # Rolf's email
-odata = readdata.ReadObs('input/NGC55-nspec-sample-v5.txt',
-                         'input/NGC55-janal-info-sample.txt',
+odata = readdata.ReadObs('input/NGC55-nspec-all-v1.txt',
+                         'input/NGC55-janal-info-all.txt',
                          mu=ufloat(26.7, 0.11))  # Rolf's email
+
+# odata = readdata.ReadObs('input/NGC55-nspec-n19-v5.txt',
+#                          'input/NGC55-janal-info-ngc55-19.txt',
+#                          mu=ufloat(26.7, 0.11))  # Rolf's email
 
 # Cluster spectrum:
 # odata = readdata.ReadObs('input/NGC2100-nspec-cspec.v4.txt',
@@ -406,6 +410,7 @@ print('[INFO] Time taken: {}s'.format(round(time.time() - then, 3)))
 
 # In this for loop we need more than one spectrum! -- change this!
 
+
 # Initialise things we want to keep:
 # This should be one object for each target
 bfclass = [0]*len(ospec)
@@ -423,23 +428,22 @@ for i, j in enumerate(ospec):
     resi = float(odata.res[i])
     mdeg = res.degrade(owave, mssam, mod.res, resi)
     print('[INFO] Time taken: {}s'.format(round(time.time() - then, 3)))
+    # Remove large scale wiggles:
+    s = contfit.wiggles(odata.wave, odata.spec[:, i])
 
     print('[INFO] Shift spectrum onto rest wavelength:')
     mspec1 = mdeg[10, 4, 4, 6]
     s1, arr_ = cc.crossc(mspec1, j, width=40)
     print('[INFO] Cross-Correlation shift = {}'.format(s1))
-    # tmp_spec, s1 = cc.ccshift(mspec1, j, owave, quiet=False, width=40)
-    s = odata.spec[:, i]  # Why is 'j' not used here?
+    # Apply the shift from the trimmed specturm j to whole observed spectrum
+    # to avioid interpolation residuals at ends of spectra
     srest, s2 = cc.ccshift(mspec1, s, odata.wave, shift1=s1, quiet=False)
     owave1, spec = trimspec(mod.twave, odata.wave, srest)
-    # spec, s1 = cc.ccshift(mspec1, j, owave, quiet=False, width=40)
 
     # Restrict logg range
     mgrid = bestfit.clipg(mdeg, mod.t, mod.g, nom(odata.L[i]))
-    # mgrid = bestfit.clipmt(mgrid, mod.mt)
-    # mgrid = mdeg
 
-    # Index over which to calculate chi-sqared
+    # Get regions to calculate chi-sqared
     line_idx = defidx(owave)
     print('[INFO] Compute chi-squared grid ...')
     then = time.time()

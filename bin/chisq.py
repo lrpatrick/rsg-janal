@@ -94,7 +94,7 @@ def chireg(w1):
     ccreg.append(np.where((w1 > 1.19550) & (w1 < 1.19986))[0])  # TiI,FeI,SiIx2
     ccreg.append(np.where((w1 > 1.19550) & (w1 < 1.19986))[0])  # TiI,FeI,SiIx2
     ccreg.append(np.where((w1 > 1.20100) & (w1 < 1.20500))[0])  # SiI
-    ccreg.append(np.where((w1 > 1.20700) & (w1 < 1.21150))[0])  # Mg & Si
+    # ccreg.append(np.where((w1 > 1.20700) & (w1 < 1.21150))[0])  # Mg & Si
     ccreg.append(np.where((w1 > 1.20700) & (w1 < 1.21150))[0])  # Mg & Si
     # ccreg.append(np.where((w1 > 1.2114) & (w1 < 1.21820))[0])  # continuum
 
