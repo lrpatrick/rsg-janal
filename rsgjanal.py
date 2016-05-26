@@ -20,13 +20,17 @@ Outside the interactive environment:
 
 References:
 Davies et al. (2010)
-Gazak (2014) Thesis
+Gazak (2014)
 
 *has been attempted to be
 
 TODO:
 -- Better modulisation of this parent script
+-- Create class for "all of the things we want to keep" in the loop I have
+    i.e. more object orientated
 -- Improve portability (particularly w.r.t model grids)
+-- Include configuration file so the script doesn't ask questions!
+    (like skycorr and molecfit)
 
 """
 from __future__ import print_function
@@ -37,7 +41,6 @@ sys.path.append("/home/lee/Work/RSG-JAnal/bin/.")
 import matplotlib.pyplot as plt
 import numpy as np
 import time
-
 from uncertainties import ufloat
 from uncertainties import unumpy
 
@@ -50,7 +53,7 @@ import resolution as res
 
 nom = unumpy.nominal_values
 
-# MCMC stuff:
+# MCMC stuff: (Should be located elsewhere)
 import emcee
 import corner
 # import matplotlib.pyplot as plt
@@ -63,94 +66,13 @@ w = str('[WARNING] ')
 e = str('[ERROR] ')
 
 
-def trimspec(w1, w2, s2):
-    """Trim s2 and w2 to match w1"""
-    roi = np.where((w2 > w1.min()) & (w2 < w1.max()))[0]
-    return w2[roi], s2[roi]
-
-
-def defidx(w1):
-    """
-    Define regions/lines for diagnostic lines to compute chisq over
-    This function is now twinned with chisq.chireg, any changes made here
-    must be relected in chisq.chireg
-    """
-    # Only the cores of individual lines (with main regions)
-    # idx = [np.where((w1 > 1.18205) & (w1 < 1.18330))[0]]  # MgI
-    # # idx = [np.where((w1 > 1.18780) & (w1 < 1.18880))[0]]  # FeI
-    # idx.append(np.where((w1 > 1.18780) & (w1 < 1.18990))[0])  # FeI & TiI
-    # idx.append(np.where((w1 > 1.19447) & (w1 < 1.19530))[0])  # TiI
-    # idx.append(np.where((w1 > 1.19650) & (w1 < 1.19965))[0])  # FeI, Si, Si
-    # idx.append(np.where((w1 > 1.20250) & (w1 < 1.20350))[0])  # SiI
-    # idx.append(np.where((w1 > 1.20780) & (w1 < 1.20870))[0])  # Mg
-    # idx.append(np.where((w1 > 1.21000) & (w1 < 1.21070))[0])  # SiI
-
-    # # Only the cores of individual lines
-    idx = [np.where((w1 > 1.18205) & (w1 < 1.18330))[0]]  # MgI
-    # idx = [np.where((w1 > 1.18780) & (w1 < 1.18880))[0]]  # FeI
-    idx.append(np.where((w1 > 1.18780) & (w1 < 1.18880))[0])  # FeI
-    idx.append(np.where((w1 > 1.18880) & (w1 < 1.18990))[0])  # TiI
-    idx.append(np.where((w1 > 1.19447) & (w1 < 1.19530))[0])  # TiI
-    idx.append(np.where((w1 > 1.19650) & (w1 < 1.19790))[0])  # FeI
-    idx.append(np.where((w1 > 1.19780) & (w1 < 1.19878))[0])  # SiI
-    idx.append(np.where((w1 > 1.19878) & (w1 < 1.19965))[0])  # SiI
-    idx.append(np.where((w1 > 1.20250) & (w1 < 1.20350))[0])  # SiI
-    # idx.append(np.where((w1 > 1.21000) & (w1 < 1.21070))[0])  # SiI
-    idx.append(np.where((w1 > 1.20780) & (w1 < 1.20870))[0])  # Mg
-    # Plus some continuum:
-    # idx.append(np.where((w1 > 1.2114) & (w1 < 1.21820))[0])  # continuum
-
-    # # Main regions containing lines
-    # idx = [np.where((w1 > 1.18000) & (w1 < 1.19200))[0]]  # MgI, FeI, TiI
-    # idx.append(np.where((w1 > 1.19400) & (w1 < 1.20600))[0])  # TiI, FeI, SiIx3
-    # idx.append(np.where((w1 > 1.20600) & (w1 < 1.21200))[0])  # SiI, MgI
-
-    # Lines & continuum
-    # idx = [np.where((w1 > 1.1879) & (w1 < 1.1899))[0]]
-    # idx = [np.where((w1 > 1.18780) & (w1 < 1.18990))[0]]  # FeI & TiI
-    # idx = [np.where((w1 > 1.18780) & (w1 < 1.18990))[0]]  # FeI & TiI
-    # idx.append(np.where((w1 > 1.18780) & (w1 < 1.18880))[0])  # FeI
-    # idx.append(np.where((w1 > 1.19447) & (w1 < 1.19986))[0])  # TiI, FeI, SiIx2
-    # idx.append(np.where((w1 > 1.19447) & (w1 < 1.19528))[0])  # TiI
-    # idx.append(np.where((w1 > 1.1965) & (w1 < 1.19986))[0])  # FeI, SiI & SiI
-    # idx.append(np.where((w1 > 1.20700) & (w1 < 1.21150))[0])  # Mg & Si
-    return idx
-
-
-def bfcontour(chi, mpar, idx, bfpars):
-    """Show contours for fit results."""
-    """This shouldn't be in this main script."""
-    xbf, zbf, gbf, tbf = bfpars
-    xii, zi, gi, ti = idx
-    xi, z, g, t = mpar
-    f, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(16, 6))
-    min1 = chi[xii, :, gi, :].min()
-    n = (min1 + 1, min1 + 2, min1 + 3, min1 + 5, min1 + 10)
-    ax1.contour(t, z, chi[xii, :, gi, :], n)
-    ax1.scatter(tbf, zbf, marker='x', color='r', s=50)
-    ax1.set_xlabel('Teff', fontsize=10)
-    ax1.set_ylabel('[Z]', fontsize=10)
-
-    min2 = chi[:, :, gi, ti].min()
-    n = (min2 + 1, min2 + 2, min2 + 3, min2 + 5, min2 + 10)
-    ax2.contour(xi, z, chi[:, :, gi, ti].T, n)
-    ax2.scatter(xbf, zbf, marker='x', color='r', s=50)
-    ax2.set_xlabel(r'$\xi$', fontsize=10)
-    ax2.set_ylabel('[Z]', fontsize=10)
-
-    min3 = chi[xii, :, :, ti].min()
-    n = (min3 + 1, min3 + 2, min3 + 3, min3 + 5, min3 + 10)
-    ax3.contour(g, z, chi[xii, :, :, ti], n)
-    ax3.scatter(gbf, zbf, marker='x', color='r', s=50)
-    ax3.set_xlabel('log (g)', fontsize=10)
-    ax3.set_ylabel('[Z]', fontsize=10)
-
-
 def outfiles():
     """Generate out-files for analysis."""
     t = time.gmtime()
     date = str(t[0]) + '-' + str(t[1]).zfill(2) + '-' + str(t[2]).zfill(2)
+
     # Write files with owave, ospec, mspec with names as filenames:
+
     for i, j in enumerate(bfspec):
         desc = '\nDescription\nObserved spctrum and bestfit model for '\
                + odata.id[i]
@@ -161,12 +83,15 @@ def outfiles():
         print(o + 'Spectra written to file: {}.dat'.format(fname))
 
     # Save final parameters to text file:
+
     pname = 'output/' + raw_input('[INFO] Please enter an appropriate \
     filename in the format xxx-pars.dat\n') + '-pars'
+
     while pname == 'output/-pars':
         print(o + 'Please include an appropriate file name:')
         pname = 'output/' + raw_input('[INFO] Please enter an appropriate \
     filename in the format xxx-pars.dat\n') + '-pars'
+
     desc = '\nDescription\nBestfit parameters for input spectra\n\
     ID, micro, [Z], logg, Teff, err_micro, err_Z, err_logg, err_teff'
     head = ('Author: LRP\nDate: ' + date + desc)
@@ -242,10 +167,9 @@ def lnprob(theta, spec, sn):
 
 
 def run_mcmc(spec, sn, ndim, nwalkers, burnin, nsteps, nout):
-
     np.random.seed(123)
 
-    # Set up the sampler.
+    # Set up the sampler
     # average micro, Z=LMC, logg=-0.1, Teff=4000
     # Z and logg cannot be set ==0.0 as pos will also be zero, always
     guess = [3.5, -0.3, -0.1, 3900]
@@ -278,8 +202,6 @@ def run_mcmc(spec, sn, ndim, nwalkers, burnin, nsteps, nout):
 
 
 def make_plots(sampler, ndim, burnin, pos, lnp):
-    # pl.clf()
-
     # fig, axes = plt.subplots(ndim, 1, sharex=True, figsize=(8, 8))
     # label = [r'$\xi$ (km/s)', '[Z] (dex)',
     #          'log g (c.g.s)', r'T$_{\rm eff}$ (K)']
@@ -321,7 +243,7 @@ def run_fit(spec, sn):
     # nsteps   = total number of steps
     # nout     = output every nout
 
-    ndim, nwalkers, burnin, nsteps, nout = 4, 300, 500, 1000, 10
+    ndim, nwalkers, burnin, nsteps, nout = 4, 300, 300, 600, 10
     print(o + 'ndim, nwalkers, burnin, nsteps, nout =',
           ndim, nwalkers, burnin, nsteps, nout)
 
@@ -346,49 +268,30 @@ print('[INFO] Please ensure all files are ordered similarly!')
 
 # These files should be user input
 
-# odata = readdata.ReadObs('../ngc6822/Spectra/N6822-spec-24AT-sam-norm.txt',
-#                          'input/NGC6822-janal-input.txt',
-#                          mu=ufloat(23.3, 0.05))
 # odata = readdata.ReadObs('input/NGC6822-janal-nspec.v1.txt',
 #                          'input/NGC6822-janal-input.txt',
 #                          mu=ufloat(23.3, 0.05))
-
-# n6822 = readdata.ReadObs('input/NGC300-janal-nspec-lum.v2.txt',
-#                          'input/NGC300-janal-info.txt',
-#                          mu=ufloat(23.5, 0.05))
 
 # odata = readdata.ReadObs('input/NGC2100-janal-nspec.v3.txt',
 #                          'input/NGC2100-janal-info.txt',
 #                          mu=ufloat(18.5, 0.05))
 
-# odata = readdata.ReadObs('input/NGC2100-bad1-nspec.txt',
-#                          'input/NGC2100-janal-info-bad1.txt',
+# odata = readdata.ReadObs('input/NGC2100-nspec-cspec.v4.txt',
+#                          'input/NGC2100-janal-info-cluster.txt',
 #                          mu=ufloat(18.5, 0.05))
 
 # odata = readdata.ReadObs('input/NGC55-nspec-galspec-v1.txt',
 #                          'input/NGC55-janal-info-gal.txt',
 #                          mu=ufloat(26.58, 0.11))  # Tanka et al. 2011
 
-# odata = readdata.ReadObs('input/ngc55-35-r5.txt',
-#                          'input/NGC55-janal-info-ngc35.txt',
+# odata = readdata.ReadObs('input/NGC55-nspec-all-v1.txt',
+#                          'input/NGC55-janal-info-all.txt',
 #                          mu=ufloat(26.7, 0.11))  # Rolf's email
-odata = readdata.ReadObs('input/NGC55-nspec-all-v1.txt',
-                         'input/NGC55-janal-info-all.txt',
-                         mu=ufloat(26.7, 0.11))  # Rolf's email
-
-# odata = readdata.ReadObs('input/NGC55-nspec-n19-v5.txt',
-#                          'input/NGC55-janal-info-ngc55-19.txt',
-#                          mu=ufloat(26.7, 0.11))  # Rolf's email
-
-# Cluster spectrum:
-# odata = readdata.ReadObs('input/NGC2100-nspec-cspec.v4.txt',
-#                          'input/NGC2100-janal-info-cluster.txt',
-#                          mu=ufloat(18.5, 0.05))
 
 # Fake Input:
-# odata = readdata.ReadObs('input/Fake-spec-Fakespec-t1.txt',
-#                          'input/Fake-info-Fakespec-t1.txt',
-#                          mu=ufloat(23.3, 0.05))
+odata = readdata.ReadObs('input/Fake-spec-Fakespec-t2.txt',
+                         'input/Fake-info-Fakespec-t2-v2.txt',
+                         mu=ufloat(23.3, 0.05))
 
 # odata = readdata.ReadObs('input/Fake-spec-Fakespec-tres-sn150-all.txt',
 #                          'input/Fake-info-Fakespec-tres-sn150-all.txt',
@@ -398,7 +301,7 @@ odata = readdata.ReadObs('input/NGC55-nspec-all-v1.txt',
 #                          mu=ufloat(23.3, 0.05))
 
 print('[INFO] Observations and models trimed to the 1.155-1.225mu region')
-owave, ospec = trimspec(mod.twave, odata.wave, odata.spec)
+owave, ospec = contfit.trimspec(mod.twave, odata.wave, odata.spec)
 ospec = ospec.T
 # For testing purposes:
 # ospec = ospec.T[0:1]
@@ -409,7 +312,6 @@ mssam = contfit.specsam(mod.twave, mod.tgrid, owave)
 print('[INFO] Time taken: {}s'.format(round(time.time() - then, 3)))
 
 # In this for loop we need more than one spectrum! -- change this!
-
 
 # Initialise things we want to keep:
 # This should be one object for each target
@@ -435,16 +337,25 @@ for i, j in enumerate(ospec):
     mspec1 = mdeg[10, 4, 4, 6]
     s1, arr_ = cc.crossc(mspec1, j, width=40)
     print('[INFO] Cross-Correlation shift = {}'.format(s1))
+
     # Apply the shift from the trimmed specturm j to whole observed spectrum
     # to avioid interpolation residuals at ends of spectra
-    srest, s2 = cc.ccshift(mspec1, s, odata.wave, shift1=s1, quiet=False)
-    owave1, spec = trimspec(mod.twave, odata.wave, srest)
+    # Only implement if significant shift is detected
+
+    if np.abs(s1) < 0.01:
+        print(o + 'Cross-Correlation consistent with zero. No shift applied')
+        srest = s
+    else:
+        srest, s2 = cc.ccshift(mspec1, s, odata.wave, shift1=s1, quiet=False)
+
+    owave1, spec = contfit.trimspec(mod.twave, odata.wave, srest)
 
     # Restrict logg range
-    mgrid = bestfit.clipg(mdeg, mod.t, mod.g, nom(odata.L[i]))
-
+    print(o + 'implement prior based on luminosity of target (if applicable)')
+    mgrid = mdeg if odata.L[i] == 0.0 else bestfit.clipg(mdeg, mod.t, mod.g,
+                                                         nom(odata.L[i]))
     # Get regions to calculate chi-sqared
-    line_idx = defidx(owave)
+    line_idx = chisq.defidx(owave)
     print('[INFO] Compute chi-squared grid ...')
     then = time.time()
     # Need to pass the the model grid and a observed spectrum class:
@@ -459,7 +370,8 @@ for i, j in enumerate(ospec):
     bfobj = bestfit.BestFit(chii, mod.head, odata.id[i])
     bfobj.showmin()
     bfobj.showavpar()
-    # bfcontour(chii, (mod.mt, mod.z, mod.g, mod.t), bfobj.fi)
+    # bfcontour(bfobj.vchi, (mod.mt, mod.z, mod.g, mod.t),
+    #           bfobj.fi, bfobj.fipar)
     # bfobj.showfin()
     print('[INFO] Time taken in seconds:', time.time() - then)
     print('------------------------------------')
@@ -509,6 +421,21 @@ def checkcontfit():
     plt.plot(ox, o, 'black')
     plt.plot(ox, mspec, 'r')
     plt.plot(ox, mscale[1][goodidx], 'blue')
+
+    # Commands to view continuum fitting process
+    s = contfit.wiggles(odata.wave, odata.spec[:, 0])
+    s1, arr_ = cc.crossc(mspec1, ospec[0], width=40)
+    srest, s2 = cc.ccshift(mspec1, s, odata.wave, shift1=s1, quiet=False)
+    owave1, spec = contfit.trimspec(mod.twave, odata.wave, srest)
+    mspec = mscale[0][bfclass[0].fi]
+    plt.figure(figsize=(8, 10))
+    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=(14, 6))
+    plt.plot(owave, spec, 'k')
+    plt.plot(owave, mspec, 'r')
+    plt.title('Normal Contiuum Fitting')
+    plt.xlabel(r'Wavelength ($\mu$m)')
+    plt.ylabel('Norm. Flux')
 
 
 def plot2(r1, in1, out1, n1, r2, in2, out2, n2):

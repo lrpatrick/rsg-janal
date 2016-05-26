@@ -1,9 +1,9 @@
 """
-    Author: LRP
-    Date: 06-11-2014
-    File Description:
-    Cross-correlation module, stolen and slightly ammended from an
-    IDL conversion
+Author: LRP
+Date: 06-11-2014
+File Description:
+Cross-correlation module, stolen and slightly ammended from an
+IDL conversion
 """
 from __future__ import print_function
 
@@ -14,32 +14,31 @@ from scipy.interpolate import UnivariateSpline
 
 def ccshift(s1, s2, x1, shift1=None, width=None, quiet=True):
     """
-        ccshift performs a cross-correlation and implements a shift based on
-        the results
-        Spectra must initially be on same x-axis for this to work effectively
+    Perform a cross-correlation and implements a shift based on
+    the results
+    Spectra must initially be on same x-axis for this to work effectively
 
-        Arguments:
-        s1 : numpy.ndarray
-            master spectrum
-        s2 : numpy.ndarray
-            spectrum to be corrected (same shape as s1)
-        x1 : numpy.ndarray
-            x-axis for the two spectra
-        width : int
-            Width for the cross-correlation
-            Default None == 15 (resolution elements)
-        shift1 : float
-            Shift to implement if known
-            Default == 0.0 which allows the module to define the shift
+    Arguments:
+    s1 : numpy.ndarray
+        master spectrum
+    s2 : numpy.ndarray
+        spectrum to be corrected (same shape as s1)
+    x1 : numpy.ndarray
+        x-axis for the two spectra
+    width : int
+        Width for the cross-correlation
+        Default None == 15 (resolution elements)
+    shift1 : float
+        Shift to implement if known
+        Default == 0.0 which allows the module to define the shift
 
-        Output:
-        s2cc_fin : numpy.ndarray
-            Cross-correlated spectrum with the shift implemented,
-                    rebinned onto input x-axis
-        shift1 : float
-            Shift used to correct s1
+    Output:
+    s2cc_fin : numpy.ndarray
+        Cross-correlated spectrum with the shift implemented,
+                rebinned onto input x-axis
+    shift1 : float
+        Shift used to correct s1
     """
-
     def checkshifts(s1, s2, s2cc, shift1, quiet=False):
 
         # Test to make sure correlation has worked
@@ -108,19 +107,6 @@ def crossc(s1, s2, ishift=None, width=None, i1=None, i2=None):
 
     Note: Output is given in the form of a tuple (offset, corr)
     """
-
-    # s1 - first spectrum
-    # s2 - second spectrum
-
-    # ishift - approximate offset (default = 0)
-    # width - search width (default = 15)
-    # i1,i2 - region in first spectrum containing the feature(s)
-    #         (default  i1=0, i2=n_elements(s2)-1)
-
-    # outputs:
-    # offset: offset of s2 from s1 in data points
-    # corr: output correlation vector
-
     if ishift is None:
         ishift = 0.0
     approx = int((ishift + 100000.5) - 100000)

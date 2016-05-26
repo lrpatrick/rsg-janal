@@ -1,18 +1,49 @@
 """
-    Author: LRP
-    Date: 03-02-2016
-    Description:
+Author: LRP
+Date: 24-05-2016
+Description:
+Maximum-likelihood parameter extimation
 
+The reason that these routines are currently housed in rsgjanal.py is that
+the ``lnlike'' function uses ``mod'' and ``bfobj.vchi''
 """
 
 import emcee
-import corner
+# import corner
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.ticker import MaxNLocator
+# import matplotlib.pyplot as plt
+import time
+# from matplotlib.ticker import MaxNLocator
+from scipy.interpolate import interpn
+
+
+# Saving space on print statements
+o = str('[INFO] ')
+w = str('[WARNING] ')
+e = str('[ERROR] ')
+
+
+def run_fit(spec, sn):
+    # ndim     = number of parameters
+    # nwalkers = number of walkers
+    # burnin   = number of burnin in steps
+    # nsteps   = total number of steps
+    # nout     = output every nout
+
+    ndim, nwalkers, burnin, nsteps, nout = 4, 300, 300, 600, 10
+    print(o + 'ndim, nwalkers, burnin, nsteps, nout =',
+          ndim, nwalkers, burnin, nsteps, nout)
+
+    sampler, pos, lnp = run_mcmc(spec, sn, ndim, nwalkers,
+                                 burnin, nsteps, nout)
+
+    results = make_plots(sampler, ndim, burnin, pos, lnp)
+    return sampler, pos, lnp, results
+
 
 def chisq(obs, err, mod):
     return np.sum(((obs - mod)**2) / err**2)
+
 
 def find_nearest(array, value):
     idx = (np.abs(array - value)).argmin()
@@ -21,52 +52,70 @@ def find_nearest(array, value):
 
 def lnprior(theta):
     mt, z, g, t = theta
-    # Start with no prior on logg for simplicity
-    # Even though it isn't stated here, there is a prior on logg as it gets
-    # clipped before it is passes to this function
-    if 1. < mt < 5. and -1. < z < 1. and -1. < g < 1. and 3400 < t < 4400:
+    # Priors are also implemented by the logg clipping for the chisq
+    # calculation
+    if 1. < mt < 5. and -1. < z < 0. and -1. < g < 1. and 3400 < t < 4400:
         return 0.0
     return -np.inf
 
 
-def lnlike(theta, ospeccc, sn):
+def lnlike(theta, spec, sn):
     mt, z, g, t = theta
-    parameters = (mod.mt, mod.z, mod.g, mod.t)
-    chidx = [find_nearest(i, j) for i, j in zip(parameters, theta)]
-    # Or just index the chisq grid
+    points = (mod.mt, mod.z, mod.g, mod.t)
+    # Index the chisq grid
     chi = bfobj.vchi
-    # like = np.exp(-chi)
-    # lnlike = -chi
-    like = -chi[chidx[0], chidx[1], chidx[2], chidx[3]]
 
-    # lnlike = -chisq(ospeccc, 1/sn, model)
+    # Nearest neighbour
+    chidx = [find_nearest(i, j) for i, j in zip(points, theta)]
+    like_check = -(chi[chidx[0], chidx[1], chidx[2], chidx[3]])/2.
+    # Interpolate the grid
+    if like_check is np.ma.masked:
+        like = -np.inf
+    else:
+        like = -(interpn(points, chi, theta, fill_value=-np.inf))/2.
+
+    # like = -(interpn(points, chi, theta, fill_value=-np.inf))/2.
+    # print(like)
+    # Compute the chisq in house:
+    # model = mgrid[chidx[0], chidx[1], chidx[2], chidx[3]]
+    # if not np.isfinite(model):
+    #     return -np.inf
+
+    # # prepare model
+    # cft = contfit.contfit(resi, owave, model, spec)[0]
+    # mscale = model / cft(owave)
+    # mcc, s = cc.ccshift(spec, mscale, owave)
+
+    # like = -chisq(spec, 1/sn, mcc)
 
     # return np.sum(np.log(like))
     # return np.sum(lnlike)
-    if not np.isfinite(like):
+    # return like
+    if not np.isfinite(like) or np.abs(like) == 0.0:
         return -np.inf
-    return like
+    return np.sum(like)
 
 
-def lnprob(theta, ospeccc, sn):
+def lnprob(theta, spec, sn):
     lp = lnprior(theta)
     if not np.isfinite(lp):
         return -np.inf
     # Prior + likelihood function
-    return lp + lnlike(theta, ospeccc, 1./sn)
+    return lp + lnlike(theta, spec, sn)
 
 
-def run_mcmc(ospeccc, sn, ndim, nwalkers, burnin, nsteps, nout):
+def run_mcmc(spec, sn, ndim, nwalkers, burnin, nsteps, nout):
 
     np.random.seed(123)
 
     # Set up the sampler.
-    # average micro, Z=LMC, logg=0.0, Teff=4000
-    guess = [3.5, -0.3, 0.2, 4000]
+    # average micro, Z=LMC, logg=-0.1, Teff=4000
+    # Z and logg cannot be set ==0.0 as pos will also be zero, always
+    guess = [3.5, -0.3, -0.1, 3900]
 
-    # How much should the initial positions alter??
     # Initial positions of the walkers in parameter space
-    pos = np.array([guess + 0.01*np.array(guess)*np.random.randn(ndim)
+    # Make sure this guess is somewhere physical!
+    pos = np.array([guess + 0.001*np.array(guess)*np.random.randn(ndim)
                     for i in range(nwalkers)])
 
     # lnprob - A function that takes a vector in the parameter space as input
@@ -75,42 +124,40 @@ def run_mcmc(ospeccc, sn, ndim, nwalkers, burnin, nsteps, nout):
     # args - (optional) A list of extra positional arguments for lnprob.
     # lnprob will be called with the sequence lnprob(p, *args, **kwargs).
     sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob,
-                                    args=(ospeccc, 1./sn), threads=1)
+                                    args=(spec, sn), threads=1)
 
     # Clear and run the production chain.
-    print("Running MCMC...")
-
+    print(o + 'Running MCMC...')
+    then = time.time()
     state = None
     while sampler.iterations < nsteps:
         pos, lnp, state = sampler.run_mcmc(pos, nout, rstate0=state)
 
-    print("Mean acceptance fraction:", np.mean(sampler.acceptance_fraction))
+    print(o + 'Time taken: {}s'.format(round(time.time() - then, 3)))
+    print(o + 'Mean acceptance frac:', np.mean(sampler.acceptance_fraction))
+    print(o + 'Autocorrelation time for each parameters:', sampler.acor)
+    print(o + 'If autocorrelation time < run time increase samples')
     return sampler, pos, lnp
 
 
 def make_plots(sampler, ndim, burnin, pos, lnp):
     # pl.clf()
 
-    fig, axes = plt.subplots(ndim, 1, sharex=True, figsize=(8, 8))
-    label = ['xi (km/s)', '[Z]', 'log g', 'T_{eff}']
+    # fig, axes = plt.subplots(ndim, 1, sharex=True, figsize=(8, 8))
+    # label = [r'$\xi$ (km/s)', '[Z] (dex)',
+    #          'log g (c.g.s)', r'T$_{\rm eff}$ (K)']
 
-    for i in range(ndim):
-        axes[i].plot(sampler.chain[:, :, i].T, color="k", alpha=0.4)
-        axes[i].yaxis.set_major_locator(MaxNLocator(5))
-        axes[i].set_ylabel(label[i])
+    # for i in range(ndim):
+    #     axes[i].plot(sampler.chain[:, :, i].T, color="k", alpha=0.4)
+    #     axes[i].yaxis.set_major_locator(MaxNLocator(5))
+    #     axes[i].set_ylabel(label[i])
 
-    fig.tight_layout(h_pad=0.0)
+    # fig.tight_layout(h_pad=0.0)
     # out1 = 'NGC2100_line-time.png'
     # fig.savefig(out1)
 
     # Make the triangle plot.
     samples = sampler.chain[:, burnin:, :].reshape((-1, ndim))
-    fig = corner.corner(samples, labels=['xi (km/s)', '[Z]', 'log g', 'T_{eff}'],
-                        truths=['NaN', 'NaN', 'NaN', 'NaN'],
-                        figsize=(8, 8))
-    # out2 = 'NGC2100_line-triangle-v2.png'
-    # fig.savefig(out2)
-
     # Compute the quantiles.
     mt_mcmc, z_mcmc, \
         g_mcmc, t_mcmc = map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
@@ -121,22 +168,10 @@ def make_plots(sampler, ndim, burnin, pos, lnp):
     print(np.round(z_mcmc, 3))
     print(np.round(g_mcmc, 3))
     print(np.round(t_mcmc, 3))
+    # fig = corner.corner(samples, labels=label,
+    #                     truths=['NaN', 'NaN', 'NaN', 'NaN'],
+    #                     figsize=(8, 8))
+    # out2 = 'NGC2100_line-triangle-v2.png'
+    # fig.savefig(out2)
 
-
-def run_fit(ospeccc, sn):
-    # ndim     = number of parameters
-    # nwalkers = number of walkers
-    # burnin   = number of burnin in steps
-    # nsteps   = total number of steps
-    # nout     = output every nout
-
-    ndim, nwalkers, burnin, nsteps, nout = 4, 100, 100, 400, 100
-    print('ndim, nwalkers, burnin, nsteps, nout =',
-          ndim, nwalkers, burnin, nsteps, nout)
-
-    sampler, pos, lnp = run_mcmc(ospeccc, sn, ndim, nwalkers,
-                                 burnin, nsteps, nout)
-
-    make_plots(sampler, ndim, burnin, pos, lnp)
-    return sampler, pos, lnp
-
+    return mt_mcmc, z_mcmc, g_mcmc, t_mcmc

@@ -18,6 +18,10 @@ from uncertainties import unumpy
 nom = unumpy.nominal_values
 stddev = unumpy.std_devs
 
+o = str('[INFO] ')
+w = str('[WARNING] ')
+e = str('[ERROR] ')
+
 
 class ReadMod(object):
     """
@@ -29,6 +33,7 @@ class ReadMod(object):
     """
 
     def __init__(self, savfile):
+        """Initiate"""
         self.all = readsav(savfile)
         self.grid = self.all['modelspec'][0][0]
         self.par = self.all['modelspec'][0][1]
@@ -87,24 +92,26 @@ class ReadMod(object):
 
 class ReadObs(object):
     """
-        ReadObs takes in:
-        1. File containing spectra: fspec
-        2. File containing info from spectra: fsinfo
-        3. Distance modulus of galaxy: mu
+    ReadObs takes in:
+    1. File containing spectra: fspec
+    2. File containing info from spectra: fsinfo
+    3. Distance modulus of galaxy: mu
 
-        For this input it assumes the following structures:
-        fspec: 1. Wavelength 2-N: Spectra
-        fsinfo:
-        0: ID
-        1-9: Photometry:B V R I J err H err K err
-        10-11: res. err
-        12: S/N
+    For this input it assumes the following structures:
+    fspec: 1. Wavelength 2-N: Spectra
+    fsinfo:
+    0: ID
+    1-9: Photometry:B V R I J err H err K err
+    10-11: res. err
+    12: S/N
 
-        Notes:
-        If observations are normalised used self.spec,
-        if not, a simple median normalisation is apllied in self.nspec
+    Notes:
+    If observations are normalised used self.spec,
+    if not, a simple median normalisation is apllied in self.nspec
     """
+
     def __init__(self, fspec, fsinfo, mu):
+        """Init"""
         self.fspec = fspec
         self.fsinfo = fsinfo
         self.mu = mu
@@ -151,7 +158,10 @@ class ReadObs(object):
             ak = 0.06  # For NGC2100
             print('[INFO] IS Extinction taken as Ak=0.06 for E(B-V)=0.17')
             l = a + b*(self.band - self.mu - ak)
-        l = a + b*(self.band - self.mu)
+        print(o + 'Where photometry is not available, L = 0.0')
+        # l = a + b*(self.band - self.mu)
+        l = np.array([0. if nom(mag) == 0. else a + b*(mag - self.mu)
+                      for mag in self.band])
         return l
 
 

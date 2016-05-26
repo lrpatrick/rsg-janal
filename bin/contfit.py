@@ -22,7 +22,7 @@ def alt_contfit(res, wave, mspec, ospec):
     2. Median filter the result (filter width = 7 i.e. extreme!)
     3. Fit third order polynomial to the reusult
     """
-    residual = ospec / mspec
+    residual = mspec / ospec
     mf7 = medfilt(residual, 7)
     return np.poly1d(np.polyfit(wave, mf7, 3)), 0, 0, 0
 
@@ -75,10 +75,19 @@ def contfit(res, wave, mspec, ospec):
     return np.poly1d(np.polyfit(wave[c3idx], r2cont, 3)), c1idx, c2idx, c3idx
 
 
+def trimspec(w1, w2, s2):
+    """Trim s2 and w2 to match w1"""
+    roi = np.where((w2 > w1.min()) & (w2 < w1.max()))[0]
+    return w2[roi], s2[roi]
+
+
 def specsam(win, inspec, wnew):
     """Update spectral sampling using scipy.interpolate.interp1d"""
-    i1d = interp1d(win, inspec)
-    return i1d(wnew)
+    if np.all(win == wnew):
+        return inspec
+    else:
+        i1d = interp1d(win, inspec)
+        return i1d(wnew)
 
 
 def wiggles(wave, s):

@@ -8,6 +8,7 @@ from __future__ import print_function
 
 import astropy.constants as c
 import astropy.units as u
+import matplotlib.pyplot as plt
 import numpy as np
 
 # Saving space on print statements
@@ -87,6 +88,35 @@ class BestFit(object):
         m = np.array(np.where(~dchi.mask))
         err = [np.std(self.prange[k][l]) for k, l in enumerate(m)]
         return err
+
+    def bfcontour(self):
+        """Show contours for fit results"""
+        chi = self.vchi
+        mpar = self.prange
+        xbf, zbf, gbf, tbf = self.fipar
+        xii, zi, gi, ti = self.fi
+        xi, z, g, t = mpar
+        f, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(16, 6))
+        min1 = chi[xii, :, gi, :].min()
+        n = (min1 + 1, min1 + 2, min1 + 3, min1 + 5, min1 + 10)
+        ax1.contour(t, z, chi[xii, :, gi, :], n)
+        ax1.scatter(tbf, zbf, marker='x', color='r', s=50)
+        ax1.set_xlabel('Teff', fontsize=10)
+        ax1.set_ylabel('[Z]', fontsize=10)
+
+        min2 = chi[:, :, gi, ti].min()
+        n = (min2 + 1, min2 + 2, min2 + 3, min2 + 5, min2 + 10)
+        ax2.contour(xi, z, chi[:, :, gi, ti].T, n)
+        ax2.scatter(xbf, zbf, marker='x', color='r', s=50)
+        ax2.set_xlabel(r'$\xi$', fontsize=10)
+        ax2.set_ylabel('[Z]', fontsize=10)
+
+        min3 = chi[xii, :, :, ti].min()
+        n = (min3 + 1, min3 + 2, min3 + 3, min3 + 5, min3 + 10)
+        ax3.contour(g, z, chi[xii, :, :, ti], n)
+        ax3.scatter(gbf, zbf, marker='x', color='r', s=50)
+        ax3.set_xlabel('log (g)', fontsize=10)
+        ax3.set_ylabel('[Z]', fontsize=10)
 
 
 def masslims():
