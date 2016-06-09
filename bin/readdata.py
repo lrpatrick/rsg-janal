@@ -160,7 +160,8 @@ class ReadObs(object):
             l = a + b*(self.band - self.mu - ak)
         print(o + 'Where photometry is not available, L = 0.0')
         # l = a + b*(self.band - self.mu)
-        l = np.array([0. if nom(mag) == 0. else a + b*(mag - self.mu)
+        l = np.array([0. if nom(mag) == 0. or nom(mag) == 99.99
+                      else a + b*(mag - self.mu)
                       for mag in self.band])
         return l
 

@@ -31,7 +31,13 @@ TODO:
 -- Improve portability (particularly w.r.t model grids)
 -- Include configuration file so the script doesn't ask questions!
     (like skycorr and molecfit)
+-- In general, set this up more like skycorr and molecfit
+    e.g. Set it up for one spectrum and make it easilly wrapable
+    I think this work work really well, bit more hasstle for me to push a set
+    through, but I think the easy of use would hugely increase
 
+-- In the input files I should be able to specifiy whether I want:
+    'cores' or 'regions' where the wavelength ranges are then stated
 """
 from __future__ import print_function
 
@@ -282,19 +288,19 @@ print('[INFO] Please ensure all files are ordered similarly!')
 
 # odata = readdata.ReadObs('input/NGC55-nspec-galspec-v1.txt',
 #                          'input/NGC55-janal-info-gal.txt',
-#                          mu=ufloat(26.58, 0.11))  # Tanka et al. 2011
+#                          mu=ufloat(26.58, 0.11))  # Tanaka et al. 2011
 
-# odata = readdata.ReadObs('input/NGC55-nspec-all-v1.txt',
-#                          'input/NGC55-janal-info-all.txt',
-#                          mu=ufloat(26.7, 0.11))  # Rolf's email
+odata = readdata.ReadObs('input/NGC55-nspec-all-v1.txt',
+                         'input/NGC55-janal-info-all.txt',
+                         mu=ufloat(26.84, 0.08))  # Kudritzki et al.(in prep)
 
 # Fake Input:
-odata = readdata.ReadObs('input/Fake-spec-Fakespec-t2.txt',
-                         'input/Fake-info-Fakespec-t2-v2.txt',
-                         mu=ufloat(23.3, 0.05))
+# odata = readdata.ReadObs('input/Fake-spec-Fakespec-t2.txt',
+#                          'input/Fake-info-Fakespec-t2.txt',
+#                          mu=ufloat(23.3, 0.05))
 
-# odata = readdata.ReadObs('input/Fake-spec-Fakespec-tres-sn150-all.txt',
-#                          'input/Fake-info-Fakespec-tres-sn150-all.txt',
+# odata = readdata.ReadObs('input/Fake-spec-Fakespec-tres-v2-sn150-sam.txt',
+#                          'input/Fake-info-Fakespec-tres-v2-sn150-sam.txt',
 #                          mu=ufloat(23.3, 0.05))
 # odata = readdata.ReadObs('input/Fake-spec-NGC6822-t1sn150.txt',
 #                          'input/Fake-info-NGC6822-t1sn150.txt',
