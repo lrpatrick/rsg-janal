@@ -85,8 +85,8 @@ class BestFit(object):
     def errparam(self):
         """Define errors for parameters where <chi-sq-min + 3"""
         dchi = np.ma.masked_greater_equal(self.vchi, self.vchi.min() + 3.)
-        m = np.array(np.where(~dchi.mask))
-        err = [np.std(self.prange[k][l]) for k, l in enumerate(m)]
+        mask = np.array(np.where(~dchi.mask))
+        err = [np.std(self.prange[k][m]) for k, m in enumerate(mask)]
         return err
 
     def bfcontour(self):
@@ -120,6 +120,7 @@ class BestFit(object):
 
 
 def masslims():
+    """Not Used"""
     print('[INFO] Mass restrictions for this data set?')
     while True:
         try:
@@ -141,30 +142,37 @@ def masslims():
     return mhigh*c.M_sun, mlow*c.M_sun
 
 
-def clipg(grid, trange, grange, l):
+def clipg(grid, trange, grange, lum, mlow, mhigh):
     """
     Clip the unphysical areas of the grid based on luminosity.
     Assumes a grid with axes: micro, Z, logg, Teff
     Insert np.nan's into the grid where the range is clipped
     """
-    newgrid = np.copy(grid)
-    # mhigh = 40.*c.M_sun
-    # mlow = 8.*c.M_sun
-    mhigh, mlow = masslims()
-    const = 4*np.pi*c.sigma_sb*c.G
-    lsi = 10**l*c.L_sun
-    g = lambda T, M: np.log10(((const*M*T**4) / lsi).cgs.value)
+    if lum == 0.0:
+        print('[INFO] No restrictions based on L or M implemented')
+        return grid
+    else:
+        newgrid = np.copy(grid)
+        mhigh = mhigh*c.M_sun
+        mlow = mlow*c.M_sun
+        # mhigh, mlow = masslims()
+        lsi = 10**lum*c.L_sun
+        # g = lambda T, M: np.log10(((const*M*T**4) / lsi).cgs.value)
+        gstep = grange[1] - grange[0]
+        ghigh = grav(trange*u.K, mhigh, lsi) + gstep
+        glow = grav(trange*u.K, mlow, lsi) - 0.3 - gstep
 
-    gstep = grange[1] - grange[0]
-    ghigh = g(trange*u.K, mhigh) + gstep
-    glow = g(trange*u.K, mlow) - 0.3 - gstep
+        print('[INFO] Rejected surface gravity models:')
+        for ti in xrange(len(trange)):
+            grej = np.where((glow[ti] > grange) | (ghigh[ti] < grange))[0]
+            newgrid[:, :, grej, ti] = np.nan
+            print(r'[INFO] Teff {}K log g {}'.format(trange[ti], grange[grej]))
+        return newgrid
 
-    print('[INFO] Rejected surface gravity models:')
-    for ti in xrange(len(trange)):
-        grej = np.where((glow[ti] > grange) | (ghigh[ti] < grange))[0]
-        newgrid[:, :, grej, ti] = np.nan
-        print(r'[INFO] Teff {}K log g {}'.format(trange[ti], grange[grej]))
-    return newgrid
+
+def grav(t, m, lum):
+    k = 4*np.pi*c.sigma_sb*c.G
+    return np.log10(((k*m*t**4) / lum).cgs.value)
 
 
 def clipmt(grid, mtrange):

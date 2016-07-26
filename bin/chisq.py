@@ -15,35 +15,35 @@ import contfit
 import cc
 
 
-def chigrid(mgrid, ospec, owave, ores, idx, snr):
+def chigrid(mgrid, ospec, owave, ores, idx, snr, ccidx, cfitdof):
     """Function could take in oclass and mspec"""
-    chi = np.zeros(mgrid.shape[0:-1])
+    chi = np.zeros(mgrid.shape[:-1])
     mscale = np.zeros(mgrid.shape)
-    cft = np.zeros(np.append(mgrid.shape[0:-1], 4))
+    cft = np.zeros(np.append(mgrid.shape[:-1], cfitdof + 1))
 
-    for i, j, k, l in itertools.product(*map(xrange, (mgrid.shape[0:-1]))):
-        # print(i, j, k, l)
+    for i, j, k, l in itertools.product(*map(xrange, (mgrid.shape[:-1]))):
         mspec = mgrid[i, j, k, l]
 
         if ~np.isnan(mspec.max()):
             chi[i, j, k, l], mscale[i, j, k, l], cft[i, j, k, l]\
-                = chiprep(ospec, owave, ores, mspec, idx, snr)
+                = chiprep(ospec, owave, ores, mspec, idx, snr, ccidx, cfitdof)
 
     return chi, mscale, cft
 
 
-def chiprep(ospec, owave, ores, mspec, idx, snr):
+def chiprep(ospec, owave, ores, mspec, idx, snr, ccidx, cfitdof):
     """
     Prep for chisq calculation
     This function could take in a oclass and mspec
     This function is now twinned with rsganal.defidx, any changes made here
     must be relected in chisq.ccregions
     """
-    cft = contfit.contfit(ores, owave, mspec, ospec)[0]
+    cft = contfit.alt_contfit(ores, owave, mspec, ospec, cfitdof)
     mscale = mspec / cft(owave)
     mcc, s = cc.ccshift(ospec, mscale, owave)
     # Calculate Chisq
-    ccregs = ccregions(owave)
+    ccregs = ccidx
+    # ccregs = ccregions(owave)
     chi = [0]*len(idx)
     for i, reg in enumerate(ccregs):
 

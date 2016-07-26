@@ -14,6 +14,7 @@ from scipy.io.idl import readsav
 from uncertainties import ufloat
 from uncertainties import unumpy
 
+from ConfigParser import SafeConfigParser
 
 nom = unumpy.nominal_values
 stddev = unumpy.std_devs
@@ -22,12 +23,14 @@ o = str('[INFO] ')
 w = str('[WARNING] ')
 e = str('[ERROR] ')
 
+parser = SafeConfigParser()
+
 
 class ReadMod(object):
     """
     Simple class to read in model grid and alter the shape of it
 
-    ... find out who desinged this grid! -- and destroy them?
+    ... find out who desinged this grid! Zach
     How could someone make the names and the grid a different order!!!
 
     """
@@ -88,6 +91,75 @@ class ReadMod(object):
         x = [self.par[0][3], self.par[0][1], self.par[0][2], self.par[0][0]]
         y = self.pnames[3], self.pnames[1], self.pnames[2], self.pnames[0]
         return (x, y)
+
+
+class ReadConfig(object):
+    """
+    Use Configuration file to obtain neccessary info on spectrum and format
+    the SafeConfigParser() class to make accessing values easier
+    """
+
+    def __init__(self, fconfig):
+        """Initiate variables, split up by sections in the config file"""
+        self.config = fconfig
+        self.success = parser.read(self.config)
+
+        # Directories
+        self.inst_dir = parser.get('directories', 'inst_dir')
+        self.obj_spec = parser.get('directories', 'input_object_spectrum')
+        self.out_dir = parser.get('directories', 'output_dir')
+        self.out_name = parser.get('directories', 'output_name')
+
+        # Spectrum
+        self.col_names = parser.get('spectrum', 'col_names')
+        self.snr = parser.getfloat('spectrum', 'snr')
+        self.res = parser.getfloat('spectrum', 'res')
+        self.res_err = parser.getfloat('spectrum', 'res_err')
+        self.wlg_micron = parser.getfloat('spectrum', 'wlg_to_micron')
+        self.vacair = parser.get('spectrum', 'vac_air')
+
+        # Input
+        self.phot_band = parser.get('input', 'phot_band')
+        self.phot_mag = parser.getfloat('input', 'phot_mag')
+        self.phot_mag_err = parser.getfloat('input', 'phot_mag_err')
+        self.is_ext = parser.getfloat('input', 'is_ext')
+        self.dm = parser.getfloat('input', 'distance_modulus')
+        self.mhigh = parser.getfloat('input', 'mhigh')
+        self.mlow = parser.getfloat('input', 'mlow')
+
+        # Mode
+        self.fit_mode = parser.get('mode', 'fit_mode')
+        self.fit_regions = np.fromstring(parser.get('mode', 'fitting_regions'),
+                                         dtype=float, sep=' ')
+        self.cc_regions = np.fromstring(parser.get('mode', 'cc_regions'),
+                                        dtype=float, sep=' ')
+
+        # Plotting
+        self.plot_type = parser.get('plotting', 'plot_type')
+
+        # Finished reading config file. Now produce some easily accessible
+        # outputs
+        # Reduce dependence upon the uncertainties package
+        self.L = self.luminosity()
+        self.wave, self.spec = np.genfromtxt(self.obj_spec).T
+
+    def luminosity(self):
+        """Calculate Luminosity based on Davies et al. (2013) correction"""
+        d = {'V': (ufloat(3.12, 0.06), ufloat(-0.29, 0.01), 2),
+             'R': (ufloat(2.44, 0.07), ufloat(-0.34, 0.01), 4),
+             'I': (ufloat(1.90, 0.08), ufloat(-0.37, 0.01), 6),
+             'J': (ufloat(1.30, 0.09), ufloat(-0.39, 0.01), 8),
+             'H': (ufloat(0.97, 0.10), ufloat(-0.40, 0.01), 10),
+             'K': (ufloat(0.90, 0.11), ufloat(-0.40, 0.01), 12)}
+
+        if self.phot_band == 'NONE':
+            print(o + 'Where photometry is not available, L = 0.0')
+            l = 0.
+            return l
+        else:
+            a, b, c = d[self.phot_band]
+            l = a + b*(self.phot_mag - self.dm + self.is_ext)
+            return l
 
 
 class ReadObs(object):

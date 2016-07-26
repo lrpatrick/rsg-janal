@@ -11,8 +11,13 @@ import numpy as np
 from scipy.interpolate import interp1d
 from scipy.signal import medfilt
 
+# ##########################
+# Why is the continuum fitting not working well for poor quality data?
+# ##########################
+# The observed spectrum doesn't appear to be corrected for wiggles ...
 
-def alt_contfit(res, wave, mspec, ospec):
+
+def alt_contfit(res, wave, mspec, ospec, cfitdof):
     """
     Default method only really works for good S/N data
     For poorer S/N data we'll do something a little more simple
@@ -24,10 +29,10 @@ def alt_contfit(res, wave, mspec, ospec):
     """
     residual = mspec / ospec
     mf7 = medfilt(residual, 7)
-    return np.poly1d(np.polyfit(wave, mf7, 3)), 0, 0, 0
+    return np.poly1d(np.polyfit(wave, mf7, cfitdof))
 
 
-def contfit(res, wave, mspec, ospec):
+def contfit(res, wave, mspec, ospec, cfitdof):
     """
     Arguments:
     res : float
@@ -72,7 +77,7 @@ def contfit(res, wave, mspec, ospec):
     # Correction function tuned:
     # Repeat previous step with outliers removed
     r2cont = mspec[c3idx] / ospec[c3idx]
-    return np.poly1d(np.polyfit(wave[c3idx], r2cont, 3)), c1idx, c2idx, c3idx
+    return np.poly1d(np.polyfit(wave[c3idx], r2cont, cfitdof))
 
 
 def trimspec(w1, w2, s2):
@@ -92,7 +97,7 @@ def specsam(win, inspec, wnew):
 
 def wiggles(wave, s):
     """
-    Remove any large scale wiggles from the spectrum using a simple 3rd order
+    Remove any large scale wiggles from the spectrum using a simple
     polynomial function
     """
     wf = np.poly1d(np.polyfit(wave, s, 3))
