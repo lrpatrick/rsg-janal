@@ -55,7 +55,8 @@ def contfit(res, wave, mspec, ospec, cfitdof):
 
     # Define continuum width
     s = 1.0
-    cw = 1.20*s / res
+    # cw = 1.2*s / res
+    cw = wave[len(wave)/2]*s / res
     n = np.ceil((cw / (wave[1] - wave[0]))).astype(int)
     # print(n)
     # Identify 'continuum' points and remove outliers

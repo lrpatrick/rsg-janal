@@ -4,19 +4,12 @@ Date: 24-05-2016
 Description:
 Maximum-likelihood parameter extimation
 
-The reason that these routines are currently housed in rsgjanal.py is that
-the ``lnlike'' function uses ``mod'' and ``bfobj.vchi''
-
-TODO: Need to be able to update prior from config file!
 """
 from __future__ import print_function
 
 import emcee
-# import corner
 import numpy as np
-# import matplotlib.pyplot as plt
 import time
-# from matplotlib.ticker import MaxNLocator
 from scipy.interpolate import interpn
 
 
@@ -31,12 +24,18 @@ def find_nearest(array, value):
     return idx
 
 
-def lnprior(theta):
+def lnprior(theta, priors):
     # Priors need to be specified in the control file
     mt, z, g, t = theta
     # Priors are also implemented by the logg clipping for the chisq
     # calculation
-    if 1.0 < mt < 5.0 and -1. < z < 0. and -1.0 < g < 1.0 and 3400 < t < 4400:
+    # priors = np.array(([1.0, 5.0, -1., 0., -1.0, 1.0, 3400, 4400]))
+    pmt, pz, pg, pt = priors.reshape(len(priors)/2, 2)
+
+    if pmt[0] < mt < pmt[1] and\
+       pz[0] < z < pz[1] and \
+       pg[0] < g < pg[1] and \
+       pt[0] < t < pt[1]:
         return 0.0
     return -np.inf
 
@@ -79,15 +78,15 @@ def lnlike(theta, spec, sn, mod, chigrid):
     return np.sum(like)
 
 
-def lnprob(theta, spec, sn, mod, chigrid):
-    lp = lnprior(theta)
+def lnprob(theta, spec, sn, mod, chigrid, priors):
+    lp = lnprior(theta, priors)
     if not np.isfinite(lp):
         return -np.inf
     # Prior + likelihood function
     return lp + lnlike(theta, spec, sn, mod, chigrid)
 
 
-def run_mcmc(spec, sn, mod, chigrid, ndim, nwalkers, burnin, nsteps, nout):
+def run_mcmc(spec, sn, mod, chigrid, priors, ndim, nwalkers, burnin, nsteps, nout):
     np.random.seed(123)
 
     # Set up the sampler
@@ -106,7 +105,8 @@ def run_mcmc(spec, sn, mod, chigrid, ndim, nwalkers, burnin, nsteps, nout):
     # args - (optional) A list of extra positional arguments for lnprob.
     # lnprob will be called with the sequence lnprob(p, *args, **kwargs).
     sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob,
-                                    args=(spec, sn, mod, chigrid), threads=1)
+                                    args=(spec, sn, mod, chigrid, priors),
+                                    threads=1)
 
     # Clear and run the production chain.
     print(o + 'Running MCMC...')
@@ -157,7 +157,7 @@ def make_plots(sampler, ndim, burnin, pos, lnp):
     return mt_mcmc, z_mcmc, g_mcmc, t_mcmc
 
 
-def run_fit(spec, sn, mod, chigrid):
+def run_fit(spec, sn, mod, chigrid, priors):
     # ndim     = number of parameters
     # nwalkers = number of walkers
     # burnin   = number of burnin in steps
@@ -167,9 +167,14 @@ def run_fit(spec, sn, mod, chigrid):
     ndim, nwalkers, burnin, nsteps, nout = 4, 300, 300, 600, 10
     print(o + 'ndim, nwalkers, burnin, nsteps, nout =',
           ndim, nwalkers, burnin, nsteps, nout)
+    print(o + 'Basic Priors')
+    print('Micro Turb.:', priors[0:2])
+    print('Metallicity:', priors[2:4])
+    print('Surface grav.:', priors[4:6])
+    print('Temperature.:', priors[6:])
 
-    sampler, pos, lnp = run_mcmc(spec, sn, mod, chigrid, ndim, nwalkers,
-                                 burnin, nsteps, nout)
+    sampler, pos, lnp = run_mcmc(spec, sn, mod, chigrid, priors,
+                                 ndim, nwalkers, burnin, nsteps, nout)
 
     results = make_plots(sampler, ndim, burnin, pos, lnp)
     return sampler, pos, lnp, results

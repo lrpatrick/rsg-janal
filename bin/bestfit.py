@@ -119,29 +119,6 @@ class BestFit(object):
         ax3.set_ylabel('[Z]', fontsize=10)
 
 
-def masslims():
-    """Not Used"""
-    print('[INFO] Mass restrictions for this data set?')
-    while True:
-        try:
-            mhigh = int(raw_input('[INFO] Upper limit: Default 40 M_sun:\n') or
-                        int(40))
-            break
-        except ValueError:
-            print('[ERROR] Fool! Input not int. Try again...')
-            print('[INFO] Please select an integer between 8 and 40')
-
-    while True:
-        try:
-            mlow = int(raw_input('[INFO] Lower limit: Default 8 M_sun:\n') or
-                       int(8))
-            break
-        except ValueError:
-            print('[ERROR] Fool! Input not int. Try again...')
-            print('[INFO] Please select an integer between 8 and 40')
-    return mhigh*c.M_sun, mlow*c.M_sun
-
-
 def clipg(grid, trange, grange, lum, mlow, mhigh):
     """
     Clip the unphysical areas of the grid based on luminosity.
@@ -173,15 +150,3 @@ def clipg(grid, trange, grange, lum, mlow, mhigh):
 def grav(t, m, lum):
     k = 4*np.pi*c.sigma_sb*c.G
     return np.log10(((k*m*t**4) / lum).cgs.value)
-
-
-def clipmt(grid, mtrange):
-    """Restrict MicroTurb range."""
-    newgrid = np.copy(grid)
-    # mhigh = 40.*c.M_sun
-    newgrid[0:9, :, :] = np.nan
-    newgrid[12:, :, :] = np.nan
-    return newgrid
-
-# Estimated parameters: vo, sigma
-# Observed data: (rv, e_rv)

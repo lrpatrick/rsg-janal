@@ -96,7 +96,7 @@ class ReadMod(object):
 class ReadConfig(object):
     """
     Use Configuration file to obtain neccessary info on spectrum and format
-    the SafeConfigParser() class to make accessing values easier
+    the SafeConfigParser() (alias parser) class to make accessing values easier
     """
 
     def __init__(self, fconfig):
@@ -127,12 +127,17 @@ class ReadConfig(object):
         self.mhigh = parser.getfloat('input', 'mhigh')
         self.mlow = parser.getfloat('input', 'mlow')
 
-        # Mode
-        self.fit_mode = parser.get('mode', 'fit_mode')
-        self.fit_regions = np.fromstring(parser.get('mode', 'fitting_regions'),
+        # Models
+        self.mod_path = parser.get('models', 'mod_path')
+
+        # Fit
+        self.fit_regions = np.fromstring(parser.get('fit', 'fitting_regions'),
                                          dtype=float, sep=' ')
-        self.cc_regions = np.fromstring(parser.get('mode', 'cc_regions'),
+        self.cc_regions = np.fromstring(parser.get('fit', 'cc_regions'),
                                         dtype=float, sep=' ')
+        self.cfit = parser.get('fit', 'cfit')
+        self.priors = np.fromstring(parser.get('fit', 'priors'),
+                                    dtype=float, sep=' ')
 
         # Plotting
         self.plot_type = parser.get('plotting', 'plot_type')

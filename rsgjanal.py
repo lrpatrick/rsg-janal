@@ -26,7 +26,6 @@ Gazak (2014)
 
 TODO:
 -- Include model path in config files
--- Include contift choices in config files
 -- Create class for "all of the things we want to keep" in the loop I have
     i.e. more object orientated
 -- Config files should include luminosity not photometry
@@ -118,9 +117,7 @@ def rsgparams(fconfig):
     # Read in model
     print('[INFO] Reading in model grid ...')
     then = time.time()
-    # TODO: include model path in config files
-    modpath = '/home/lee/Work/RSG-JAnal/models/MODELSPEC_251114_J_nlte_R10000_J_turb_abun_grav_temp-int.sav'
-    mod = readdata.ReadMod(modpath)
+    mod = readdata.ReadMod(config.mod_path)
     print('[INFO] Time taken: {}s'.format(round(time.time() - then, 3)))
 
     print(o + 'Observations and models trimed to the 1.155-1.225mu region')
@@ -140,7 +137,7 @@ def rsgparams(fconfig):
     mdeg = res.degrade(owave, mssam, mod.res, resi)
     print(o + 'Time taken: {}s'.format(round(time.time() - then, 3)))
     # Remove large scale wiggles:
-    s = contfit.wiggles(config.wave, config.spec)
+    # s = contfit.wiggles(config.wave, config.spec)
 
     print(o + 'Shift spectrum onto rest wavelength:')
     mspec1 = mdeg[10, 4, 4, 6]
@@ -153,9 +150,10 @@ def rsgparams(fconfig):
 
     if np.abs(s1) < 0.01:
         print(o + 'Cross-Correlation consistent with zero. No shift applied')
-        srest = s
+        srest = config.spec
     else:
-        srest, s2 = cc.ccshift(mspec1, s, config.wave, shift1=s1, quiet=False)
+        srest, s2 = cc.ccshift(mspec1, config.spec, config.wave,
+                               shift1=s1, quiet=False)
 
     owave1, spec = contfit.trimspec(mod.twave, config.wave, srest)
 
@@ -164,9 +162,6 @@ def rsgparams(fconfig):
     mgrid = bestfit.clipg(mdeg, mod.t, mod.g, nom(config.L),
                           config.mlow, config.mhigh)
 
-    # Should be changed to use config
-    # Get regions to calculate chi-sqared
-    # line_idx = chisq.defidx(owave)
     low, high = config.fit_regions.reshape(len(config.fit_regions)/2., 2).T
     line_idx = [between(owave, l, h) for l, h in zip(low, high)]
 
@@ -176,8 +171,8 @@ def rsgparams(fconfig):
     then = time.time()
     # Need to pass the the model grid and a observed spectrum class:
     cfitdof = 3
-    chi, mscale, cft = chisq.chigrid(mgrid, spec, owave, resi,
-                                     line_idx, sn, cc_idx, cfitdof)
+    chi, mscale, cft = chisq.chigrid(mgrid, spec, owave, resi, line_idx, sn,
+                                     cc_idx, config.cfit, cfitdof)
     chii = chi  # / len(line_idx)
     print(o + 'Time taken: {}s'.format(round(time.time() - then, 3)))
 
@@ -191,9 +186,9 @@ def rsgparams(fconfig):
     # bfobj.showfin()
     print(o + 'Time taken in seconds:', time.time() - then)
     print('------------------------------------')
-    sampler, pos, lnp, pars_mcmc = maxlike.run_fit(spec, sn, mod, bfobj.vchi)
+    sampler, pos, lnp, pars_mcmc = maxlike.run_fit(spec, sn, mod, bfobj.vchi,
+                                                   config.priors)
 
-    # How is this the bestfitting spectrum?
     theta = np.array(pars_mcmc)[:, 0]
     points = (mod.mt, mod.z, mod.g, mod.t)
     bfidx = [maxlike.find_nearest(i, j) for i, j in zip(points, theta)]

@@ -19,6 +19,11 @@ uncertainties
 
 Notes:
 
+-- Commit on 11-08-2016
+    included configuration files for all input information
+    chi-squared calculation includes a normalisation of 1/Npix.
+    This appears to be neccessary in order to recover test input parameters
+
 -- Currently, users must edit rsgjanal.py to include their input files.
 This is done on line 154 where odata is defined.
 
