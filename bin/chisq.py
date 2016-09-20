@@ -49,21 +49,30 @@ def chiprep(ospec, owave, ores, mspec, idx, snr, ccidx, cfit, cfitdof):
         cft = contfit.contfit(ores, owave, mspec, ospec, cfitdof)
 
     mscale = mspec / cft(owave)
-    mcc, s = cc.ccshift(ospec, mscale, owave)
+    mcc, s = cc.ccshift(ospec, mscale, owave, quiet=True)
     # Calculate Chisq
     ccregs = ccidx
     chi = [0]*len(idx)
+    ndof = 4
     for i, reg in enumerate(ccregs):
 
-        oreg = ospec[reg]
-        wreg = owave[reg]
-        mreg_tmp, sreg = cc.ccshift(oreg, mscale[reg], wreg, quiet=True)
-        mreg, sreg1 = cc.ccshift(owave, mscale, owave, shift1=sreg)
-        chi[i] = chisq(ospec[idx[i]], 1./snr, mreg[idx[i]]) / len(idx[i][0])
+        test = False
+
+        if test is False:
+            oreg = ospec[reg]
+            wreg = owave[reg]
+            mreg_tmp, sreg = cc.ccshift(oreg, mscale[reg], wreg, quiet=True)
+            mreg, sreg1 = cc.ccshift(owave, mscale, owave, shift1=sreg)
+            chi[i] = chisq(ospec[idx[i]], 1./snr, mreg[idx[i]]) / (len(idx[i][0]) - ndof)
+        else:
+            chi[i] = chisq(ospec[idx[i]], 1./snr, mspec[idx[i]]) / (len(idx[i][0]) - ndof)
 
     chisum = np.sum(chi)
     return chisum, mcc, cft
 
 
 def chisq(obs, err, mod):
-    return np.sum(((obs - mod)**2) / err**2)
+    residuals = (obs - mod)/err
+    chi = np.sum(residuals**2)
+    return chi
+    # return np.sum(((obs - mod)**2) / err**2)

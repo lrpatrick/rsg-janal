@@ -54,25 +54,8 @@ def lnlike(theta, spec, sn, mod, chigrid):
     if like_check is np.ma.masked:
         like = -np.inf
     else:
-        like = -(interpn(points, chi, theta, fill_value=-np.inf))/2.
+        like = -(interpn(points, chi, theta, fill_value=np.inf))/2.
 
-    # like = -(interpn(points, chi, theta, fill_value=-np.inf))/2.
-    # print(like)
-    # Compute the chisq in house:
-    # model = mgrid[chidx[0], chidx[1], chidx[2], chidx[3]]
-    # if not np.isfinite(model):
-    #     return -np.inf
-
-    # # prepare model
-    # cft = contfit.contfit(resi, owave, model, spec)[0]
-    # mscale = model / cft(owave)
-    # mcc, s = cc.ccshift(spec, mscale, owave)
-
-    # like = -chisq(spec, 1/sn, mcc)
-
-    # return np.sum(np.log(like))
-    # return np.sum(lnlike)
-    # return like
     if not np.isfinite(like) or np.abs(like) == 0.0:
         return -np.inf
     return np.sum(like)
@@ -86,17 +69,20 @@ def lnprob(theta, spec, sn, mod, chigrid, priors):
     return lp + lnlike(theta, spec, sn, mod, chigrid)
 
 
-def run_mcmc(spec, sn, mod, chigrid, priors, ndim, nwalkers, burnin, nsteps, nout):
+def run_mcmc(spec, sn, mod, chigrid, priors, iguess,
+             ndim, nwalkers, burnin, nsteps, nout):
     np.random.seed(123)
 
     # Set up the sampler
     # average micro, Z=LMC, logg=-0.1, Teff=4000
     # Z and logg cannot be set ==0.0 as pos will also be zero, always
-    guess = [3.5, -0.3, -0.1, 3900]
+    # iguess = np.array([3.0, -0.1, -0.1, 4000])
+    iguess = np.array(iguess) + 0.001
+    print(o + 'Initial guess:', iguess)
 
     # Initial positions of the walkers in parameter space
-    # Make sure this guess is somewhere physical!
-    pos = np.array([guess + 0.001*np.array(guess)*np.random.randn(ndim)
+    # Make sure this iguess is somewhere physical!
+    pos = np.array([iguess + 0.001*np.array(iguess)*np.random.randn(ndim)
                     for i in range(nwalkers)])
 
     # lnprob - A function that takes a vector in the parameter space as input
@@ -157,7 +143,7 @@ def make_plots(sampler, ndim, burnin, pos, lnp):
     return mt_mcmc, z_mcmc, g_mcmc, t_mcmc
 
 
-def run_fit(spec, sn, mod, chigrid, priors):
+def run_fit(spec, sn, mod, chigrid, priors, iguess):
     # ndim     = number of parameters
     # nwalkers = number of walkers
     # burnin   = number of burnin in steps
@@ -173,7 +159,7 @@ def run_fit(spec, sn, mod, chigrid, priors):
     print('Surface grav.:', priors[4:6])
     print('Temperature.:', priors[6:])
 
-    sampler, pos, lnp = run_mcmc(spec, sn, mod, chigrid, priors,
+    sampler, pos, lnp = run_mcmc(spec, sn, mod, chigrid, priors, iguess,
                                  ndim, nwalkers, burnin, nsteps, nout)
 
     results = make_plots(sampler, ndim, burnin, pos, lnp)

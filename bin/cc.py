@@ -48,9 +48,12 @@ def ccshift(s1, s2, x1, shift1=None, width=None, quiet=True):
             print('[INFO] Cross-Correlation shift = ', shift1)
             print('[INFO] After correction shift = ', shift2)
         if abs(shift2) > abs(shift1):
-            print('[WARNING] Cross-Correlation not effective.')
-            print('[WARNING] No correction applied')
-            return s2, 0.0
+            if quiet is False:
+                print('[WARNING] Cross-Correlation not effective.')
+                print('[WARNING] No correction applied')
+                return s2, 0.0
+            else:
+                return s2, 0.0
         else:
             return s2cc_fin, shift1
 
@@ -165,9 +168,10 @@ def crossc(s1, s2, ishift=None, width=None, i1=None, i2=None):
     k = k[0][0]
 
     if (k == 0) or (k == (width - 1.0)):
-        print('[WARNING]', end=' ')
-        print('modules.crossc', end=' ')
-        print('Exception: maximum on edge of search area')
+        # Rmoved warnings as this is expected in some cases:
+        # print('[WARNING]', end=' ')
+        # print('modules.crossc', end=' ')
+        # print('Exception: maximum on edge of search area')
         offset = 0.
         corr = 0.
         return (offset, corr)

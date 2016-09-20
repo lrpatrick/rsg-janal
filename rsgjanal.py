@@ -102,6 +102,21 @@ def between(x, low, up):
     return idx
 
 
+def cut_grid(grid, pars, priors):
+    """Prime the grid with the priors i.e. replace spectra with np.nan's"""
+    p = np.reshape(priors, (len(priors)/2, 2))
+    cutgrid = np.copy(grid)
+
+    for count, (par, prior) in enumerate(zip(pars, p)):
+        throw = np.where((par < prior[0]) | (par > prior[1]))[0]
+        sl = [slice(None)]*count + [throw]
+
+        if np.shape(throw)[0] != 0:
+            cutgrid[sl] = np.nan
+
+    return cutgrid
+
+
 def rsgparams(fconfig):
     """
     Main function to estimate stellar parameters from RSGs
@@ -126,7 +141,9 @@ def rsgparams(fconfig):
     print(o + 'Resampling model grid ...')
     then = time.time()
     # Would it not make more sense to do this when required?
-    mssam = contfit.specsam(mod.twave, mod.tgrid, owave)
+    pars = (mod.mt, mod.z, mod.g, mod.t)
+    cgrid = cut_grid(mod.tgrid, pars, config.priors)
+    mssam = contfit.specsam(mod.twave, cgrid, owave)
     print(o + 'Time taken: {}s'.format(round(time.time() - then, 3)))
 
     print(o + 'Degrading model grid to resolution of observation')
@@ -173,13 +190,12 @@ def rsgparams(fconfig):
     cfitdof = 3
     chi, mscale, cft = chisq.chigrid(mgrid, spec, owave, resi, line_idx, sn,
                                      cc_idx, config.cfit, cfitdof)
-    chii = chi  # / len(line_idx)
     print(o + 'Time taken: {}s'.format(round(time.time() - then, 3)))
 
     print('------------------------------------')
     print(o + 'Calcualte bestfit parameters ...')
     then = time.time()
-    bfobj = bestfit.BestFit(chii, mod.head, config.out_name)
+    bfobj = bestfit.BestFit(chi, mod.head, config.out_name)
     bfobj.showmin()
     bfobj.showavpar()
     # bfobj.bfcontour()
@@ -187,7 +203,7 @@ def rsgparams(fconfig):
     print(o + 'Time taken in seconds:', time.time() - then)
     print('------------------------------------')
     sampler, pos, lnp, pars_mcmc = maxlike.run_fit(spec, sn, mod, bfobj.vchi,
-                                                   config.priors)
+                                                   config.priors, bfobj.fipar)
 
     theta = np.array(pars_mcmc)[:, 0]
     points = (mod.mt, mod.z, mod.g, mod.t)
@@ -196,7 +212,7 @@ def rsgparams(fconfig):
     # pars = np.array(bfobj.wpar, bfobj.err)
     # pars = pars.reshape(len(pars), 8)
     outfiles(config, owave, spec, bfspec, pars_mcmc)
-    return bfspec, config, owave, spec, pars_mcmc, bfobj
+    return bfspec, config, owave, spec, pars_mcmc, bfobj  # , sampler, pos, lnp, mgrid
 
 # fconfig = sys.argv[1]
 # bfspec, config, owave, spec, bfspec, pars_mcmc, bfobj = rsgparams(fconfig)
