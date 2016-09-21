@@ -36,7 +36,6 @@ from __future__ import print_function
 import sys
 sys.path.append("/home/lee/Work/RSG-JAnal/bin/.")
 
-import matplotlib.pyplot as plt
 import numpy as np
 import time
 # from uncertainties import ufloat
@@ -51,13 +50,6 @@ import readdata
 import resolution as res
 
 nom = unumpy.nominal_values
-
-# MCMC stuff: (Should be located elsewhere)
-# import emcee
-# import corner
-# # import matplotlib.pyplot as plt
-# from scipy.interpolate import interpn
-# from matplotlib.ticker import MaxNLocator
 
 # Saving space on print statements
 o = str('[INFO] ')
@@ -202,8 +194,14 @@ def rsgparams(fconfig):
     # bfobj.showfin()
     print(o + 'Time taken in seconds:', time.time() - then)
     print('------------------------------------')
-    sampler, pos, lnp, pars_mcmc = maxlike.run_fit(spec, sn, mod, bfobj.vchi,
-                                                   config.priors, bfobj.fipar)
+    if config.iguess == 'weighted':
+        print('[INFO] Initial guesses using weighted parameters')
+        samp, pos, lnp, pars_mcmc = maxlike.run_fit(spec, sn, mod, bfobj.vchi,
+                                                    config.priors, bfobj.wpar)
+    else:
+        print('[INFO] Initial guesses using chi-squared minimium')
+        samp, pos, lnp, pars_mcmc = maxlike.run_fit(spec, sn, mod, bfobj.vchi,
+                                                    config.priors, bfobj.fipar)
 
     theta = np.array(pars_mcmc)[:, 0]
     points = (mod.mt, mod.z, mod.g, mod.t)
@@ -212,7 +210,4 @@ def rsgparams(fconfig):
     # pars = np.array(bfobj.wpar, bfobj.err)
     # pars = pars.reshape(len(pars), 8)
     outfiles(config, owave, spec, bfspec, pars_mcmc)
-    return bfspec, config, owave, spec, pars_mcmc, bfobj  # , sampler, pos, lnp, mgrid
-
-# fconfig = sys.argv[1]
-# bfspec, config, owave, spec, bfspec, pars_mcmc, bfobj = rsgparams(fconfig)
+    return bfspec, config, owave, spec, pars_mcmc, bfobj

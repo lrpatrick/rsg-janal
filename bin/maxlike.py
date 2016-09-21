@@ -7,11 +7,13 @@ Maximum-likelihood parameter extimation
 """
 from __future__ import print_function
 
+import corner
 import emcee
+import matplotlib.pyplot as plt
 import numpy as np
 import time
+from matplotlib.ticker import MaxNLocator
 from scipy.interpolate import interpn
-
 
 # Saving space on print statements
 o = str('[INFO] ')
@@ -109,38 +111,28 @@ def run_mcmc(spec, sn, mod, chigrid, priors, iguess,
 
 
 def make_plots(sampler, ndim, burnin, pos, lnp):
-    # fig, axes = plt.subplots(ndim, 1, sharex=True, figsize=(8, 8))
-    # label = [r'$\xi$ (km/s)', '[Z] (dex)',
-    #          'log g (c.g.s)', r'T$_{\rm eff}$ (K)']
+    fig, axes = plt.subplots(ndim, 1, sharex=True, figsize=(8, 8))
+    label = [r'$\xi$ (km/s)', '[Z] (dex)',
+             'log g (c.g.s)', r'T$_{\rm eff}$ (K)']
 
-    # for i in range(ndim):
-    #     axes[i].plot(sampler.chain[:, :, i].T, color="k", alpha=0.4)
-    #     axes[i].yaxis.set_major_locator(MaxNLocator(5))
-    #     axes[i].set_ylabel(label[i])
+    for i in range(ndim):
+        axes[i].plot(sampler.chain[:, :, i].T, color="k", alpha=0.4)
+        axes[i].yaxis.set_major_locator(MaxNLocator(5))
+        axes[i].set_ylabel(label[i])
 
-    # fig.tight_layout(h_pad=0.0)
-    # out1 = 'NGC2100_line-time.png'
-    # fig.savefig(out1)
-
+    fig.tight_layout(h_pad=0.0)
     # Make the triangle plot.
     samples = sampler.chain[:, burnin:, :].reshape((-1, ndim))
-    # Compute the quantiles.
-    mt_mcmc, z_mcmc, \
-        g_mcmc, t_mcmc = map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
-                             zip(*np.percentile(samples, [16, 50, 84],
-                                 axis=0)))
-    print('[INFO] param median +1sig -1sig')
-    print(np.round(mt_mcmc, 3))
-    print(np.round(z_mcmc, 3))
-    print(np.round(g_mcmc, 3))
-    print(np.round(t_mcmc, 3))
-    # fig = corner.corner(samples, labels=label,
-    #                     truths=['NaN', 'NaN', 'NaN', 'NaN'],
-    #                     figsize=(8, 8))
-    # out2 = 'NGC2100_line-triangle-v2.png'
-    # fig.savefig(out2)
+    # # Compute the quantiles.
+    # mt_mcmc, z_mcmc, \
+    #     g_mcmc, t_mcmc = map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
+    #                          zip(*np.percentile(samples, [16, 50, 84],
+    #                              axis=0)))
 
-    return mt_mcmc, z_mcmc, g_mcmc, t_mcmc
+    fig = corner.corner(samples, labels=label,
+                        truths=['NaN', 'NaN', 'NaN', 'NaN'],
+                        figsize=(8, 8))
+    return
 
 
 def run_fit(spec, sn, mod, chigrid, priors, iguess):
@@ -154,13 +146,24 @@ def run_fit(spec, sn, mod, chigrid, priors, iguess):
     print(o + 'ndim, nwalkers, burnin, nsteps, nout =',
           ndim, nwalkers, burnin, nsteps, nout)
     print(o + 'Basic Priors')
-    print('Micro Turb.:', priors[0:2])
-    print('Metallicity:', priors[2:4])
-    print('Surface grav.:', priors[4:6])
-    print('Temperature.:', priors[6:])
+    print('Micro Turb.: {}'.format(priors[0:2]))
+    print('Metallicity: {}'.format(priors[2:4]))
+    print('Surface grav.: {}'.format(priors[4:6]))
+    print('Temperature.: {}'.format(priors[6:]))
 
     sampler, pos, lnp = run_mcmc(spec, sn, mod, chigrid, priors, iguess,
                                  ndim, nwalkers, burnin, nsteps, nout)
 
-    results = make_plots(sampler, ndim, burnin, pos, lnp)
+    # make_plots(sampler, ndim, burnin, pos, lnp)
+
+    samples = sampler.chain[:, burnin:, :].reshape((-1, ndim))
+    # Compute the quantiles.
+    results = map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
+                  zip(*np.percentile(samples, [16, 50, 84], axis=0)))
+
+    print('[INFO] param median +1sig -1sig')
+    print('Micro Turb.: {}'.format(np.round(results[0], 3)))
+    print('Metallicity: {}'.format(np.round(results[1], 3)))
+    print('Surface grav.: {}'.format(np.round(results[2], 3)))
+    print('Temperature.: {}'.format(np.round(results[3], 3)))
     return sampler, pos, lnp, results

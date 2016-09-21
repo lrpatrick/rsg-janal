@@ -138,6 +138,7 @@ class ReadConfig(object):
         self.cfit = parser.get('fit', 'cfit')
         self.priors = np.fromstring(parser.get('fit', 'priors'),
                                     dtype=float, sep=' ')
+        self.iguess = parser.get('fit', 'iguess')
 
         # Plotting
         self.plot_type = parser.get('plotting', 'plot_type')
@@ -167,80 +168,80 @@ class ReadConfig(object):
             return l
 
 
-class ReadObs(object):
-    """
-    ReadObs takes in:
-    1. File containing spectra: fspec
-    2. File containing info from spectra: fsinfo
-    3. Distance modulus of galaxy: mu
+# class ReadObs(object):
+#     """
+#     ReadObs takes in:
+#     1. File containing spectra: fspec
+#     2. File containing info from spectra: fsinfo
+#     3. Distance modulus of galaxy: mu
 
-    For this input it assumes the following structures:
-    fspec: 1. Wavelength 2-N: Spectra
-    fsinfo:
-    0: ID
-    1-9: Photometry:B V R I J err H err K err
-    10-11: res. err
-    12: S/N
+#     For this input it assumes the following structures:
+#     fspec: 1. Wavelength 2-N: Spectra
+#     fsinfo:
+#     0: ID
+#     1-9: Photometry:B V R I J err H err K err
+#     10-11: res. err
+#     12: S/N
 
-    Notes:
-    If observations are normalised used self.spec,
-    if not, a simple median normalisation is apllied in self.nspec
-    """
+#     Notes:
+#     If observations are normalised used self.spec,
+#     if not, a simple median normalisation is apllied in self.nspec
+#     """
 
-    def __init__(self, fspec, fsinfo, mu):
-        """Init"""
-        self.fspec = fspec
-        self.fsinfo = fsinfo
-        self.mu = mu
+#     def __init__(self, fspec, fsinfo, mu):
+#         """Init"""
+#         self.fspec = fspec
+#         self.fsinfo = fsinfo
+#         self.mu = mu
 
-        # Star info:
-        self.info = np.genfromtxt(self.fsinfo)
-        self.id = np.genfromtxt(self.fsinfo, usecols=0, dtype='S')
-        self.phot = self.info[:, 1:15]
-        self.res = self.info[:, 15]
-        self.eres = self.info[:, 16]
-        self.sn = self.info[:, 17]
+#         # Star info:
+#         self.info = np.genfromtxt(self.fsinfo)
+#         self.id = np.genfromtxt(self.fsinfo, usecols=0, dtype='S')
+#         self.phot = self.info[:, 1:15]
+#         self.res = self.info[:, 15]
+#         self.eres = self.info[:, 16]
+#         self.sn = self.info[:, 17]
 
-        self.wavenspec = np.genfromtxt(self.fspec)
-        self.wave = self.wavenspec[:, 0]
-        self.spec = self.wavenspec[:, 1:]
-        self.nspec = self.spec / np.median(self.spec, axis=0)
+#         self.wavenspec = np.genfromtxt(self.fspec)
+#         self.wave = self.wavenspec[:, 0]
+#         self.spec = self.wavenspec[:, 1:]
+#         self.nspec = self.spec / np.median(self.spec, axis=0)
 
-        # self.mk = unumpy.uarray(self.phot[:, 10], self.phot[:, 11])
-        self.L = self.luminosity()
-        # self.gup, self.glow = self.glimits()
+#         # self.mk = unumpy.uarray(self.phot[:, 10], self.phot[:, 11])
+#         self.L = self.luminosity()
+#         # self.gup, self.glow = self.glimits()
 
-    def luminosity(self):
-        """Calculate Luminosity based on Davies et al. (2013) correction"""
-        print('[INFO] Please enter filter to compute bolometric correction')
-        band = raw_input('[INFO] Options [V, R, I, J, H, K]\n')
-        options = ['V', 'R', 'I', 'J', 'H', 'K']
-        while band not in options:
-            print('[INFO] You fool! {} is not a valid option!'.format(band))
-            print('[INFO] Please select a valid filter:')
-            band = raw_input('[INFO] Options [V, R, I, J, H, K]\n')
+#     def luminosity(self):
+#         """Calculate Luminosity based on Davies et al. (2013) correction"""
+#         print('[INFO] Please enter filter to compute bolometric correction')
+#         band = raw_input('[INFO] Options [V, R, I, J, H, K]\n')
+#         options = ['V', 'R', 'I', 'J', 'H', 'K']
+#         while band not in options:
+#             print('[INFO] You fool! {} is not a valid option!'.format(band))
+#             print('[INFO] Please select a valid filter:')
+#             band = raw_input('[INFO] Options [V, R, I, J, H, K]\n')
 
-        d = {'V': (ufloat(3.12, 0.06), ufloat(-0.29, 0.01), 2),
-             'R': (ufloat(2.44, 0.07), ufloat(-0.34, 0.01), 4),
-             'I': (ufloat(1.90, 0.08), ufloat(-0.37, 0.01), 6),
-             'J': (ufloat(1.30, 0.09), ufloat(-0.39, 0.01), 8),
-             'H': (ufloat(0.97, 0.10), ufloat(-0.40, 0.01), 10),
-             'K': (ufloat(0.90, 0.11), ufloat(-0.40, 0.01), 12)}
-        a, b, c = d[band]
-        # a = d[band][0]
-        # b = d[band][1]
-        # c = d[band][2]
-        self.band = unumpy.uarray(self.phot[:, c], self.phot[:, c + 1])
-        if band == 'K':
-            ak = 0.06  # For NGC2100
-            print('[INFO] IS Extinction taken as Ak=0.06 for E(B-V)=0.17')
-            l = a + b*(self.band - self.mu - ak)
-        print(o + 'Where photometry is not available, L = 0.0')
-        # l = a + b*(self.band - self.mu)
-        l = np.array([0. if nom(mag) == 0. or nom(mag) == 99.99
-                      else a + b*(mag - self.mu)
-                      for mag in self.band])
-        return l
+#         d = {'V': (ufloat(3.12, 0.06), ufloat(-0.29, 0.01), 2),
+#              'R': (ufloat(2.44, 0.07), ufloat(-0.34, 0.01), 4),
+#              'I': (ufloat(1.90, 0.08), ufloat(-0.37, 0.01), 6),
+#              'J': (ufloat(1.30, 0.09), ufloat(-0.39, 0.01), 8),
+#              'H': (ufloat(0.97, 0.10), ufloat(-0.40, 0.01), 10),
+#              'K': (ufloat(0.90, 0.11), ufloat(-0.40, 0.01), 12)}
+#         a, b, c = d[band]
+#         # a = d[band][0]
+#         # b = d[band][1]
+#         # c = d[band][2]
+#         self.band = unumpy.uarray(self.phot[:, c], self.phot[:, c + 1])
+#         if band == 'K':
+#             ak = 0.06  # For NGC2100
+#             print('[INFO] IS Extinction taken as Ak=0.06 for E(B-V)=0.17')
+#             l = a + b*(self.band - self.mu - ak)
+#         print(o + 'Where photometry is not available, L = 0.0')
+#         # l = a + b*(self.band - self.mu)
+#         l = np.array([0. if nom(mag) == 0. or nom(mag) == 99.99
+#                       else a + b*(mag - self.mu)
+#                       for mag in self.band])
+#         return l
 
 
 def maregion(wave, w1, w2):
